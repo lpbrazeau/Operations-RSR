@@ -893,6 +893,11 @@ const EMP_VIEWS=["dispatch"]; /* Pointage non déployé au terrain pour l'instan
 let MY_RESSOURCE=null;
 function isAdmin(){return ROLE==="admin";}
 function adminOnly(){if(!isAdmin()){toast("Action réservée aux administrateurs","info");return false;}return true;}
+const ROLE_VIEWS={gerant_meca:["dispatch","pointage","equipement","outils"]};
+function allowedViews(){if(isAdmin())return null;return ROLE_VIEWS[ROLE]||EMP_VIEWS;}
+function canView(v){const a=allowedViews();return !a||a.includes(v);}
+function canManageMeca(){return isAdmin()||ROLE==="gerant_meca";}
+function mecaOnly(){if(!canManageMeca()){toast("Action réservée","info");return false;}return true;}
 let filters={soum:{statut:"",client:"",q:""},proj:{statut:"",q:""},emp:{cat:"",q:"",sort:"nom-asc"},equip:{cat:"",q:"",sort:"nom-asc"},planif:{year:new Date().getFullYear(),type:"",group:"equipe"},cli:{q:""},mat:{q:"",projet:"",mois:"",code:"",sortKey:null,sortDir:"asc"},st:{q:"",projet:"",mois:""},four:{q:"",region:""},outil:{q:"",group:"categorie"}};
 
 /* ---------- helpers ---------- */
@@ -1940,7 +1945,7 @@ function renderOutils(){
     ${grpHtml||'<div class="empty">Aucun outil. Clique « Ajouter un outil » pour créer une fiche avec suivi d\'étalonnage.</div>'}`;
 }
 function openOutil(id){
-  if(typeof adminOnly==="function"&&!adminOnly())return;
+  if(typeof mecaOnly==="function"&&!mecaOnly())return;
   const o=id?(DATA.outils||[]).find(x=>x.id===id):null;
   const d=o||{id:uid("out"),nom:"",description:"",categorie:"",remorque:"",contremaitreId:"",numeroSerie:"",frequenceMois:"",dernierEtalonnage:"",prochainEtalonnage:"",notes:"",formulaires:[]};
   OUTIL_FORMS=(d.formulaires||[]).slice();
@@ -4179,7 +4184,7 @@ const VIEW_META={
 };
 function setView(v){
   if(!VIEW_META[v])v="dashboard";
-  if(!isAdmin()&&!EMP_VIEWS.includes(v))v="dispatch";
+  if(!canView(v)){const _a=allowedViews();v=(_a&&_a[0])||"dispatch";}
   curView=v;
   $$("#nav a").forEach(a=>a.classList.toggle("active",a.dataset.v===v));
   $$(".view").forEach(el=>el.classList.remove("active"));
@@ -4357,14 +4362,14 @@ async function loadProfile(){
 function applyRole(){
   const admin=isAdmin();
   document.body.classList.toggle("role-emp",!admin);
-  $$("#nav a[data-v]").forEach(a=>{a.style.display=(admin||EMP_VIEWS.includes(a.dataset.v))?"":"none";});
+  $$("#nav a[data-v]").forEach(a=>{a.style.display=canView(a.dataset.v)?"":"none";});
   $$("#nav [data-adminonly]").forEach(el=>{el.style.display=admin?"":"none";});
   // masquer les libellés de groupe sans lien visible
   $$("#nav .grp").forEach(g=>{let n=g.nextElementSibling,vis=false;while(n&&!n.classList.contains("grp")){if(n.matches&&n.matches("a[data-v]")&&n.style.display!=="none")vis=true;n=n.nextElementSibling;}if(!g.hasAttribute("data-adminonly"))g.style.display=vis?"":"none";});
   const nq=$("#btn-new-quick");if(nq)nq.style.display=admin?"":"none";
   const ex=$("#btn-export");if(ex&&ex.parentElement)ex.parentElement.style.display=admin?"":"none";
-  const badge=$("#role-badge");if(badge){badge.textContent=admin?"Admin":"Employé";badge.className="role-badge "+(admin?"adm":"emp");}
-  const pa=$("#page-action");if(pa)pa.style.display=(admin||curView==="pointage")?"":"none";
+  const badge=$("#role-badge");if(badge){badge.textContent=admin?"Admin":(ROLE==="gerant_meca"?"Gérant méca":"Employé");badge.className="role-badge "+(admin?"adm":"emp");}
+  const pa=$("#page-action");if(pa)pa.style.display=(admin||curView==="pointage"||(canManageMeca()&&(curView==="equipement"||curView==="outils")))?"":"none";
 }
 async function renderAcces(){
   if(!isAdmin()){$("#view-acces").innerHTML='<div class="empty">Réservé aux administrateurs.</div>';return;}
@@ -4378,19 +4383,20 @@ async function renderAcces(){
     return `<div class="acc-row">
     <div class="acc-ava ${pr.role==='admin'?'adm':'emp'}">${esc((pr.email||'?').slice(0,2).toUpperCase())}</div>
     <div style="flex:1;min-width:0"><div class="nm">${esc(pr.email||pr.id)}</div>
-      <div class="ct">${pr.role==='admin'?'Administrateur — accès complet':'Employé — Planification (lecture)'}${linked?' · 👷 '+esc(linked.nom):'<span style="color:var(--red)"> · non lié</span>'}</div></div>
+      <div class="ct">${pr.role==='admin'?'Administrateur — accès complet':(pr.role==='gerant_meca'?'Gérant mécanique — Planif., Pointage, Équipement, Outils':'Employé — Planification (lecture)')}${linked?' · 👷 '+esc(linked.nom):'<span style="color:var(--red)"> · non lié</span>'}</div></div>
     <select class="acc-link" onchange="setRessource('${pr.id}',this.value)" title="Carte employé liée (pour SMS)">
       <option value="">— lier à un employé —</option>
       ${emps.map(r=>`<option value="${r.id}" ${pr.ressource_id===r.id?'selected':''}>${esc(r.nom)}${r.tel?' ('+esc(r.tel)+')':''}</option>`).join("")}
     </select>
     <select class="acc-role" onchange="setRole('${pr.id}',this.value)">
-      <option value="employe" ${pr.role!=='admin'?'selected':''}>Employé</option>
+      <option value="employe" ${(pr.role!=='admin'&&pr.role!=='gerant_meca')?'selected':''}>Employé</option>
+      <option value="gerant_meca" ${pr.role==='gerant_meca'?'selected':''}>Gérant mécanique</option>
       <option value="admin" ${pr.role==='admin'?'selected':''}>Admin</option>
     </select></div>`;}).join("");
   $("#view-acces").innerHTML=`
     <div class="toolbar"><div class="kpi-inline"><b>${profs.length}</b> utilisateur(s)</div></div>
     <div class="acc-list">${rows||'<div class="empty">Aucun utilisateur. Les comptes apparaissent ici après leur première connexion.</div>'}</div>
-    <p class="muted" style="font-size:12px;margin-top:12px">💡 Un <b>employé</b> ne voit que la <b>Planification</b> (lecture seule). Un <b>admin</b> voit tout. <b>Lie chaque login à sa carte employé</b> (menu de gauche) — c'est nécessaire pour lui envoyer sa planification par SMS.</p>`;
+    <p class="muted" style="font-size:12px;margin-top:12px">💡 <b>Employé</b> : Planification. <b>Gérant mécanique</b> : Planification, Pointage, Équipement, Outils. <b>Admin</b> : tout. <b>Lie chaque login à sa carte employé</b> (menu de gauche) — c'est nécessaire pour lui envoyer sa planification par SMS.</p>`;
 }
 async function setRole(id,role){
   try{const r=await sb.from("profiles").update({role}).eq("id",id);if(r.error)throw r.error;toast("Rôle mis à jour","ok");renderAcces();}
