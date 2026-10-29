@@ -3879,12 +3879,16 @@ function openDispatchAssign(projetId,date,affId,preCode){
   const opOpts=`<option value="">— aucun —</option>`+humains.map(r=>`<option value="${r.id}" ${ex&&ex.operateurId===r.id?"selected":""}>${esc(r.nom)}</option>`).join("");
   const eqCheck=meca.map(r=>`<label class="da-eqitem"><input type="checkbox" class="da-eq" value="${r.id}"> <span style="color:${catColor(r.categorie)};font-weight:800">🚜</span> ${esc(resNom(r))}${r.categorie?` <span class="muted">· ${esc(r.categorie)}</span>`:''}</label>`).join("");
   const dt=new Date(date+"T00:00:00");
+  const _projsA=DATA.projets.filter(x=>["obtenu","en_cours"].includes(x.statut)).sort((a,b)=>a.numero<b.numero?1:-1);
+  if(!_projsA.some(x=>x.id===projetId)&&p)_projsA.unshift(p);
+  const projOpts=_projsA.map(x=>`<option value="${x.id}" ${x.id===projetId?'selected':''}>${esc(x.numero)} · ${esc(x.nom)}</option>`).join("");
   openModal(`
-    <div class="modal-head"><div class="hx"><h2>${ex?'Modifier':'Assigner au dispatch'}</h2><div class="hs">${esc(p.numero)} · ${esc(p.nom)} — ${cap(dt.toLocaleDateString("fr-CA",{weekday:"long",day:"numeric",month:"long"}))}</div></div><button class="x" onclick="closeModal()">×</button></div>
+    <div class="modal-head"><div class="hx"><h2>${ex?'Modifier':'Assigner au dispatch'}</h2><div class="hs">${cap(dt.toLocaleDateString("fr-CA",{weekday:"long",day:"numeric",month:"long"}))}</div></div><button class="x" onclick="closeModal()">×</button></div>
     <div class="modal-body"><div class="form-grid">
+      <div class="fld full"><label>Projet</label><select id="da-proj" onchange="daProjChange()">${projOpts}</select></div>
       <div class="fld full"><label>Ressource</label><select id="da-res" onchange="daResChange()">${resOpts}</select></div>
       <div class="fld"><label>Journée</label><select id="da-demi"><option value="">Complète</option><option value="1" ${ex&&ex.demi?'selected':''}>Demi-journée</option></select></div>
-      ${projHasCodes(projetId)?`<div class="fld"><label>Code de coût</label><select id="da-code">${codeOptions(projetId,ex?ex.codeId:(preCode||null))}</select></div>`:''}
+      <div class="fld" id="da-code-cell" style="${projHasCodes(projetId)?'':'display:none'}"><label>Code de coût</label><select id="da-code">${projHasCodes(projetId)?codeOptions(projetId,ex?ex.codeId:(preCode||null)):''}</select></div>
       <div class="fld full" id="da-op-wrap" style="display:none"><label>Opéré par (employé)</label><select id="da-op">${opOpts}</select></div>
     </div>
     <div id="da-eq-wrap" style="display:none">
@@ -3904,7 +3908,14 @@ function daResChange(){
   if(ow)ow.style.display=isEq?"":"none";
   if(isHuman){const linked=new Set((DATA.affectations||[]).filter(a=>a.operateurId===rid&&a.projetId===DA_CTX.projetId&&coversDay(a,DA_CTX.date)).map(a=>a.ressourceId));$$(".da-eq").forEach(cb=>{cb.checked=linked.has(cb.value);});}
 }
+function daProjChange(){
+  const pid=$("#da-proj")?$("#da-proj").value:"";DA_CTX.projetId=pid;
+  const cell=$("#da-code-cell"),sel=$("#da-code");
+  if(projHasCodes(pid)){if(sel)sel.innerHTML=codeOptions(pid,null);if(cell)cell.style.display="";}else{if(sel)sel.innerHTML="";if(cell)cell.style.display="none";}
+  if(typeof daResChange==="function")daResChange();
+}
 async function saveDispatchAssign(projetId,date,affId){
+  const _selP=$("#da-proj");if(_selP&&_selP.value)projetId=_selP.value;
   const rid=$("#da-res").value;if(!rid){toast("Choisis une ressource","err");return;}
   const r=DATA.ressources.find(x=>x.id===rid);const demi=$("#da-demi").value==="1";
   const codeId=(projHasCodes(projetId)&&$("#da-code"))?($("#da-code").value||null):null;
