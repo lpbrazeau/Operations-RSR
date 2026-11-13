@@ -827,7 +827,9 @@ body.role-emp .pg-cell{cursor:default}
         <button id="btn-export" title="Sauvegarde JSON"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Backup</button>
         <button id="btn-import" title="Restaurer JSON"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 9l5-5 5 5M12 4v12"/></svg> Restaurer</button>
       </div>
+      <button id="btn-maj" title="Importer une mise à jour (fusion, non destructif) depuis le fichier RSR_maj_donnees.json" style="margin-top:6px;background:#0f766e;color:#fff;border-color:#0f766e"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v6h6M20 20v-6h-6M20 8a8 8 0 0 0-14.3-3M4 16a8 8 0 0 0 14.3 3"/></svg> Importer MàJ (fusion)</button>
       <input type="file" id="file-import" accept="application/json" hidden>
+      <input type="file" id="file-maj" accept="application/json" hidden>
     </div>
   </aside>
   <div class="sb-backdrop" id="sb-backdrop" onclick="closeSidebar()"></div>
@@ -4314,6 +4316,72 @@ $("#btn-export").onclick=()=>{
   const blob=new Blob([JSON.stringify({v:2,exportedAt:new Date().toISOString(),data:DATA},null,2)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);
   a.download="RSR_OPS_backup_"+today()+".json";a.click();toast("Sauvegarde exportée","ok");
+};
+/* ===== Import de mise à jour par FUSION (non destructif) ===== */
+const pkeyRSR=x=>{const d=(x==null?"":String(x)).replace(/\D/g,"");if(d.length<3)return "";const n=parseInt(d.slice(2),10);return isNaN(n)?"":d.slice(0,2)+"-"+n;};
+async function rsrMergeImport(d){
+  const idxP=new Map(); DATA.projets.forEach(p=>{const k=pkeyRSR(p.numero);if(k&&!idxP.has(k))idxP.set(k,p);});
+  const keyToId=new Map(); let newP=0,updP=0;
+  for(const ip of (d.projets||[])){
+    const k=ip.pkey||pkeyRSR(ip.numero); const ex=k?idxP.get(k):null;
+    if(ex){
+      if(ip.nom)ex.nom=ip.nom; if(ip.statut)ex.statut=ip.statut; if(ip.client)ex.client=ip.client;
+      if(ip.prixSoumission!=null)ex.prixSoumission=ip.prixSoumission;
+      if(ip.prixOctroie!=null)ex.prixOctroie=ip.prixOctroie;
+      if(ip.montantAFacturer!=null)ex.montantAFacturer=ip.montantAFacturer;
+      if(ip.montantFacture!=null)ex.montantFacture=ip.montantFacture;
+      if(ip.mdoProjete!=null)ex.mdoProjete=ip.mdoProjete;
+      if(ip.coutEstime!=null)ex.coutEstime=ip.coutEstime;
+      if(ip.noteSuivi)ex.noteSuivi=ip.noteSuivi;
+      ex.complete=ex.statut==="complete"; ex.margeEstimeePct=margeEstPct(ex); ex.margeReelPct=margeReelPct(ex); ex.updatedAt=today();
+      await idbPut("projets",ex); updP++; if(k)keyToId.set(k,ex.id);
+    } else {
+      const rec={id:uid("p"),numero:ip.numero||"",nom:ip.nom||"",client:ip.client||"PUBLIC",statut:ip.statut||"soumission",noteSuivi:ip.noteSuivi||"",dateDepot:null,deposee:false,prixSoumission:ip.prixSoumission??null,revenuAnticipe:null,prixOctroie:ip.prixOctroie??null,mdoProjete:ip.mdoProjete??null,productionProjetee:null,coutEstime:ip.coutEstime??null,dateExecDebut:null,dateExecFin:null,montantAFacturer:ip.montantAFacturer??null,montantFacture:ip.montantFacture??null,repartition:[],mdoReel:null,productionReelle:null,coutReel:null,complete:ip.statut==="complete",entrees:[],codes:[],materiaux:[],sousTraitants:[],createdAt:today(),updatedAt:today()};
+      rec.margeEstimeePct=margeEstPct(rec); rec.margeReelPct=margeReelPct(rec);
+      await idbPut("projets",rec); newP++; const kk=k||pkeyRSR(rec.numero); if(kk){idxP.set(kk,rec);keyToId.set(kk,rec.id);}
+    }
+  }
+  const blKey=b=>[(b.numBL||""),(b.produit||""),(b.montant==null?"":b.montant)].join("|");
+  const idxB=new Map(); (DATA.bons||[]).forEach(b=>idxB.set(blKey(b),b));
+  let newB=0,updB=0,errB=0;
+  for(const ib of (d.bons||[])){
+    const pid=ib.projetKey?(keyToId.get(ib.projetKey)||null):null; const k=blKey(ib); const ex=idxB.get(k);
+    try{
+      if(ex){
+        if(ib.date)ex.date=ib.date; if(ib.fournisseur)ex.fournisseur=ib.fournisseur; if(ib.po)ex.po=ib.po;
+        if(ib.quantite!=null)ex.quantite=ib.quantite; if(ib.prixUnit!=null)ex.prixUnit=ib.prixUnit; if(ib.montant!=null)ex.montant=ib.montant;
+        if(pid)ex.projetId=pid; if(ib.projetTexte)ex.projetRef=ib.projetTexte;
+        await idbPut("bons",ex); updB++;
+      } else {
+        const rec={id:uid("bl"),date:ib.date||today(),numBL:ib.numBL||"",fournisseur:ib.fournisseur||"",po:ib.po||"",projetId:pid,projetRef:ib.projetTexte||"",codeId:null,produit:ib.produit||"",quantite:ib.quantite??null,prixUnit:ib.prixUnit??null,montant:ib.montant??null,createdAt:today()};
+        await idbPut("bons",rec); idxB.set(k,rec); newB++;
+      }
+    }catch(e){errB++; if(errB<=1)console.warn("BL import err:",e.message||e);}
+  }
+  await loadAll();
+  return {newP,updP,newB,updB,errB};
+}
+$("#btn-maj").onclick=()=>$("#file-maj").click();
+$("#file-maj").onchange=e=>{
+  const file=e.target.files[0]; if(!file)return;
+  const rd=new FileReader();
+  rd.onload=async ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(!d.rsrImport||!Array.isArray(d.projets))throw new Error("Ce fichier n'est pas un fichier de mise à jour RSR (RSR_maj_donnees.json).");
+      const nP=d.projets.length, nB=(d.bons||[]).length;
+      if(!confirm("Importer la mise à jour par FUSION ?\n\n• "+nP+" projets (ajout des nouveaux + mise à jour des existants par numéro)\n• "+nB+" bons de livraison\n\nAucune donnée existante n'est effacée. Les employés, équipements, équipes et outils ne sont pas touchés.\n\nFichier généré le "+(d.genere||"?")))return;
+      toast("Import en cours… ne ferme pas la page","ok");
+      const r=await rsrMergeImport(d);
+      if(typeof refresh==="function")refresh();
+      let msg="Import terminé — Projets: "+r.newP+" ajoutés, "+r.updP+" mis à jour • BL: "+r.newB+" ajoutés, "+r.updB+" mis à jour";
+      if(r.errB)msg+=" • "+r.errB+" BL en erreur";
+      toast(msg,r.errB?"err":"ok");
+      alert(msg);
+    }catch(err){toast("Erreur import : "+(err.message||err),"err");alert("Erreur import : "+(err.message||err));}
+    finally{e.target.value="";}
+  };
+  rd.readAsText(file);
 };
 $("#btn-import").onclick=()=>$("#file-import").click();
 $("#file-import").onchange=e=>{
