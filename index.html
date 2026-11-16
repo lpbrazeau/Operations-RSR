@@ -189,6 +189,7 @@ tbody tr:last-child td{border-bottom:0}
 .pg-week{position:sticky;top:0;z-index:3;background:var(--surface-2);padding:7px 4px;text-align:center;font-family:var(--mono);font-weight:600;color:var(--muted);font-size:11px}
 .pg-week.cur{background:var(--accent-soft);color:var(--accent-d)}
 .pg-week small{display:block;font-size:9px;font-weight:500;opacity:.75;font-family:var(--sans)}
+.pg-res[draggable="true"]{cursor:grab}.pg-res.dragging,.pg-sub.eq.dragging{opacity:.45}.pg-sub.eq[draggable="true"]{cursor:grab}.pg-cell.drop-hot{outline:2px dashed var(--accent);outline-offset:-2px;background:rgba(15,118,110,.16)}.planif-actif-lbl{display:inline-flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap}.planif-actif-lbl select{max-width:230px;padding:3px 7px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:12px}
 .pg-res{position:sticky;left:0;z-index:2;background:var(--surface);padding:8px 12px;font-weight:600;display:flex;align-items:center;gap:8px}
 .pg-res .rmini{width:9px;height:9px;border-radius:3px;flex:0 0 auto}
 .pg-sub{grid-column:1/-1;background:var(--navy);color:#cfd6df;font-size:10.5px;text-transform:uppercase;letter-spacing:1px;font-weight:700;padding:6px 12px;position:sticky;left:0}
@@ -1916,7 +1917,7 @@ function outilStatus(o){
   if(days<=30)return {cls:"soon",label:"Dans "+days+" j",days};
   return {cls:"ok",label:fmtDate(pe),days};
 }
-function freqLabel(m){return ({"6":"aux 6 mois","12":"1 an","24":"2 ans"})[String(m)]||"";}
+function freqLabel(m){return ({"6":"aux 6 mois","12":"1 an","24":"2 ans","36":"3 ans"})[String(m)]||"";}
 function addMonthsISO(iso,m){if(!iso||!m)return "";const d=new Date(iso+"T00:00:00");d.setMonth(d.getMonth()+Number(m));return isoLocal(d);}
 function outilRecalcProch(){
   const freq=$("#ou-freq")?$("#ou-freq").value:"";const dern=$("#ou-dern")?$("#ou-dern").value:"";
@@ -1987,7 +1988,7 @@ function openOutil(id){
         <div class="fld full"><label>Description</label><textarea id="ou-desc" rows="2" placeholder="Détails de l'outil…">${esc(d.description)}</textarea></div>
         <div class="fld"><label>Remorque / rangement</label><input id="ou-rem" list="ou-remlist" value="${esc(d.remorque)}" placeholder="Dans quelle remorque il se trouve"><datalist id="ou-remlist">${remOpts}</datalist></div>
         <div class="fld"><label>Contremaître affecté</label><select id="ou-cm">${cmOpts}</select></div>
-        <div class="fld"><label>Fréquence d'étalonnage</label><select id="ou-freq" onchange="outilRecalcProch()"><option value="">— aucune / manuel —</option><option value="6" ${d.frequenceMois==6?'selected':''}>Aux 6 mois</option><option value="12" ${d.frequenceMois==12?'selected':''}>1 an</option><option value="24" ${d.frequenceMois==24?'selected':''}>2 ans</option></select></div>
+        <div class="fld"><label>Fréquence d'étalonnage</label><select id="ou-freq" onchange="outilRecalcProch()"><option value="">— aucune / manuel —</option><option value="6" ${d.frequenceMois==6?'selected':''}>Aux 6 mois</option><option value="12" ${d.frequenceMois==12?'selected':''}>1 an</option><option value="24" ${d.frequenceMois==24?'selected':''}>2 ans</option><option value="36" ${d.frequenceMois==36?'selected':''}>3 ans</option></select></div>
         <div class="fld"><label>Dernier étalonnage</label><input type="date" id="ou-dern" value="${esc(d.dernierEtalonnage||'')}" onchange="outilRecalcProch()"></div>
         <div class="fld"><label>Prochain étalonnage <span class="pill" id="ou-proch-auto" style="${d.frequenceMois?'':'display:none'}">auto</span></label><input type="date" id="ou-proch" value="${esc(d.prochainEtalonnage||'')}"></div>
         <div class="fld full"><label>Notes</label><textarea id="ou-notes" rows="2">${esc(d.notes||'')}</textarea></div>
@@ -2282,14 +2283,14 @@ function renderPlanification(){
       for(let i=from;i<=to;i++)cells[i].push({label:(DOSSIER_TYPES[d.type]?.lbl||d.type).slice(0,8),title:(r.nom+" · "+(d.titre||DOSSIER_TYPES[d.type]?.lbl)),cls:cls,id:d.id,at:"res"});
     });
     let row=`<div class="pg-row" style="grid-template-columns:${gridCols}">
-      <div class="pg-res"><span class="rmini" style="background:${r.type==='mecanique'?'var(--navy)':'var(--accent)'}"></span>
+      <div class="pg-res" draggable="true" data-dres="${r.id}" title="Glisse-moi sur une semaine pour affecter"><span class="rmini" style="background:${r.type==='mecanique'?'var(--navy)':'var(--accent)'}"></span>
         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(resNom(r))}</span></div>`;
     for(let i=0;i<52;i++){
       const blocks=cells[i].map(b=>{
         const act=b.at==='aff'?`editAffectation('${b.id}')`:b.at==='vac'?`openVacance('${b.id}')`:`openRessource('${r.id}')`;
         return `<div class="pblock ${b.cls}" title="${esc(b.title)}" onclick="event.stopPropagation();${act}">${esc(b.label)}${b.code?`<span class="pb-code">${esc(b.code)}</span>`:''}</div>`;
       }).join("");
-      row+=`<div class="pg-cell ${i===curIdx?'cur':''}" onclick="newAffectation('${r.id}',${year},${weeks[i].week})">${blocks}<span class="addm">+</span></div>`;
+      row+=`<div class="pg-cell ${i===curIdx?'cur':''}" data-week="${weeks[i].week}" data-res="${r.id}" onclick="newAffectation('${r.id}',${year},${weeks[i].week})">${blocks}<span class="addm">+</span></div>`;
     }
     row+=`</div>`;return row;
   }
@@ -2305,7 +2306,7 @@ function renderPlanification(){
       const rows=ids.map(id=>ress.find(r=>r.id===id)).filter(Boolean);
       ids.forEach(id=>assigned.add(id));
       const cm=DATA.ressources.find(r=>r.id===e.contremaitreId);
-      body+=`<div class="pg-sub eq" style="border-left:4px solid ${e.couleur||'var(--accent)'}">
+      body+=`<div class="pg-sub eq" draggable="true" data-dteam="${e.id}" title="Glisse l'équipe sur une semaine" style="border-left:4px solid ${e.couleur||'var(--accent)'}">
         <span style="width:10px;height:10px;border-radius:3px;background:${e.couleur||'var(--accent)'};display:inline-block"></span>
         ${esc(e.nom)} ${cm?`· 👷 ${esc(cm.nom)}`:'· <span style="opacity:.7">sans contremaître</span>'}
         <span class="eqedit" onclick="openEquipeEditor('${e.id}')">✎ modifier</span></div>`;
@@ -2322,11 +2323,13 @@ function renderPlanification(){
   }
 
   const byEq=f.group==='equipe';
+  const _scP=document.querySelector(".content"); const _stP=_scP?_scP.scrollTop:0;
   $("#view-planification").innerHTML=`
     ${planifAlertsBanner()}
     ${!isAdmin()?`<div class="ro-banner">👁️ Lecture seule — voici la planification. ${MY_RESSOURCE?"Cherche ton nom pour voir ton horaire.":""}</div>`:""}
     <div class="toolbar">
       <div class="segbtn"><button class="chip ${!byEq?'on':''}" data-g="">Par ressource</button><button class="chip ${byEq?'on':''}" data-g="equipe">Par équipe</button></div>
+      ${(typeof isAdmin!=="function"||isAdmin())?`<label class="planif-actif-lbl" title="Choisis un projet, pis glisse une ressource ou une équipe sur une semaine pour l'affecter d'un coup">🎯 <select id="planif-actif" onchange="PLANIF_ACTIF=this.value">${planifActifOptions()}</select></label>`:''}
       ${byEq?'':`<span style="width:1px;height:20px;background:var(--line)"></span>
       <button class="chip ${!f.type?'on':''}" data-t="">Toutes</button>
       <button class="chip ${f.type==='humaine'?'on':''}" data-t="humaine">👷 Humaines</button>
@@ -2346,6 +2349,9 @@ function renderPlanification(){
   $$('#view-planification .chip[data-t]').forEach(c=>c.onclick=()=>{filters.planif.type=c.dataset.t;renderPlanification();});
   $("#planif-year").onchange=e=>{filters.planif.year=Number(e.target.value);renderPlanification();};
   const _pw=$(".planif-wrap");if(_pw&&curIdx>=0)_pw.scrollLeft=Math.max(0,curIdx*64-80);
+  const _as=$("#planif-actif"); if(_as)_as.value=PLANIF_ACTIF;
+  wirePlanifDnD();
+  if(_scP){_scP.scrollTop=_stP;requestAnimationFrame(()=>{try{_scP.scrollTop=_stP;}catch(e){}});}
 }
 
 /* ==================================================================
@@ -2720,6 +2726,55 @@ async function deleteRessource(id){
 }
 
 /* ---- Affectation modal ---- */
+var PLANIF_ACTIF="";
+function planifActifOptions(){
+  const opts=DATA.projets.filter(p=>["obtenu","en_cours","complete"].includes(p.statut))
+    .map(p=>`<option value="${p.id}" ${PLANIF_ACTIF===p.id?'selected':''}>${esc(p.numero)} · ${esc(p.nom)}</option>`).join("");
+  return `<option value="">— projet actif : demander à chaque dépôt —</option>`+opts;
+}
+async function planifDropAssign(kind,dragId,week){
+  if(typeof adminOnly==="function"&&!adminOnly())return;
+  const year=filters.planif.year;
+  const w=weeksOfYear(year).find(x=>x.week===week); if(!w)return;
+  const deb=w.start.toISOString().slice(0,10);
+  const end=new Date(w.start); end.setDate(end.getDate()+4); const fin=end.toISOString().slice(0,10);
+  let ids=[];
+  if(kind==="team"){const t=(DATA.equipes||[]).find(e=>e.id===dragId); if(t)ids=[...new Set([t.contremaitreId,...(t.membres||[])].filter(Boolean))];}
+  else ids=[dragId];
+  ids=ids.filter(id=>DATA.ressources.find(r=>r.id===id));
+  if(!ids.length){toast("Ressource introuvable","err");return;}
+  const projetId=PLANIF_ACTIF;
+  if(!projetId){ if(kind==="team"){newAffectation(ids[0],year,week);} else {newAffectation(dragId,year,week);} return; }
+  const proj=DATA.projets.find(p=>p.id===projetId); if(!proj){toast("Projet actif invalide","err");return;}
+  let done=0,vskip=0;
+  for(const rid of ids){
+    if(typeof vacOverlaps==="function"&&vacOverlaps(rid,deb,fin)){vskip++;continue;}
+    await idbPut("affectations",{id:uid("a"),projetId,ressourceId:rid,codeId:null,dateDebut:deb,dateFin:fin,heures:(typeof DEFAULT_HEURES!=="undefined"?DEFAULT_HEURES:8),role:""});
+    done++;
+  }
+  await loadAll();
+  toast((kind==="team"?"Équipe":"Ressource")+" → "+proj.numero+" · S-"+String(week).padStart(2,"0")+" ("+done+" affectation"+(done>1?"s":"")+")"+(vskip?" · "+vskip+" en vacances (ignoré"+(vskip>1?"s":"")+")":""),"ok");
+  if(curView==="planification")renderPlanification();
+}
+function wirePlanifDnD(){
+  const host=$("#view-planification"); if(!host||host._dndWired)return; host._dndWired=true;
+  host.addEventListener("dragstart",e=>{
+    const src=e.target.closest&&e.target.closest("[data-dres],[data-dteam]"); if(!src)return;
+    const payload=src.dataset.dres?("res:"+src.dataset.dres):("team:"+src.dataset.dteam);
+    try{e.dataTransfer.setData("text/plain",payload);e.dataTransfer.effectAllowed="copy";}catch(_){}
+    src.classList.add("dragging");
+  });
+  host.addEventListener("dragend",e=>{host.querySelectorAll(".dragging").forEach(x=>x.classList.remove("dragging"));host.querySelectorAll(".drop-hot").forEach(x=>x.classList.remove("drop-hot"));});
+  host.addEventListener("dragover",e=>{const c=e.target.closest&&e.target.closest(".pg-cell");if(c){e.preventDefault();try{e.dataTransfer.dropEffect="copy";}catch(_){}c.classList.add("drop-hot");}});
+  host.addEventListener("dragleave",e=>{const c=e.target.closest&&e.target.closest(".pg-cell");if(c)c.classList.remove("drop-hot");});
+  host.addEventListener("drop",e=>{
+    const c=e.target.closest&&e.target.closest(".pg-cell"); if(!c)return;
+    e.preventDefault(); c.classList.remove("drop-hot");
+    const data=(e.dataTransfer.getData("text/plain")||""); const wk=Number(c.dataset.week); if(!wk||!data)return;
+    if(data.indexOf("res:")===0)planifDropAssign("res",data.slice(4),wk);
+    else if(data.indexOf("team:")===0)planifDropAssign("team",data.slice(5),wk);
+  });
+}
 function newAffectation(ressourceId,year,week,projetId){
   if(!adminOnly())return;
   let startDate="",endDate="";
@@ -4259,7 +4314,13 @@ function setView(v){
   renderCurrent();
   try{applyRole();}catch(e){}
 }
+var _lastRV=null;
 function renderCurrent(){
+  const _sc=document.querySelector(".content"); const _same=_lastRV===curView; const _st=_sc&&_same?_sc.scrollTop:0; _lastRV=curView;
+  _rcDispatch();
+  if(_sc){_sc.scrollTop=_st;requestAnimationFrame(()=>{try{_sc.scrollTop=_st;}catch(e){}});}
+}
+function _rcDispatch(){
   if(curView==="dashboard")renderDashboard();
   else if(curView==="soumissions")renderSoumissions();
   else if(curView==="clients")renderClients();
@@ -4358,8 +4419,28 @@ async function rsrMergeImport(d){
       }
     }catch(e){errB++; if(errB<=1)console.warn("BL import err:",e.message||e);}
   }
+  // ----- OUTILS (fusion par numéro de série, sinon par nom) -----
+  let newO=0,updO=0;
+  if(Array.isArray(d.outils)){
+    const idxO=new Map(); (DATA.outils||[]).forEach(o=>{const k=((o.numeroSerie||o.nom||"")+"").toLowerCase().trim();if(k)idxO.set(k,o);});
+    for(const io of d.outils){
+      const k=((io.numeroSerie||io.nom||"")+"").toLowerCase().trim(); const ex=k?idxO.get(k):null;
+      if(ex){
+        if(io.nom)ex.nom=io.nom; if(io.description)ex.description=io.description;
+        if(io.categorie)ex.categorie=io.categorie; if(io.numeroSerie)ex.numeroSerie=io.numeroSerie;
+        if(io.frequenceMois!==""&&io.frequenceMois!=null)ex.frequenceMois=io.frequenceMois;
+        if(io.dernierEtalonnage)ex.dernierEtalonnage=io.dernierEtalonnage;
+        if(io.prochainEtalonnage)ex.prochainEtalonnage=io.prochainEtalonnage;
+        if(io.notes)ex.notes=io.notes;
+        await idbPut("outils",ex); updO++;
+      } else {
+        const rec={id:uid("ou"),nom:io.nom||"",description:io.description||"",categorie:io.categorie||"",remorque:"",contremaitreId:"",numeroSerie:io.numeroSerie||"",frequenceMois:io.frequenceMois??"",dernierEtalonnage:io.dernierEtalonnage||"",prochainEtalonnage:io.prochainEtalonnage||"",notes:io.notes||"",formulaires:[]};
+        await idbPut("outils",rec); if(k)idxO.set(k,rec); newO++;
+      }
+    }
+  }
   await loadAll();
-  return {newP,updP,newB,updB,errB};
+  return {newP,updP,newB,updB,errB,newO,updO};
 }
 $("#btn-maj").onclick=()=>$("#file-maj").click();
 $("#file-maj").onchange=e=>{
@@ -4370,12 +4451,13 @@ $("#file-maj").onchange=e=>{
       const d=JSON.parse(ev.target.result);
       if(!d.rsrImport||!Array.isArray(d.projets))throw new Error("Ce fichier n'est pas un fichier de mise à jour RSR (RSR_maj_donnees.json).");
       const nP=d.projets.length, nB=(d.bons||[]).length;
-      if(!confirm("Importer la mise à jour par FUSION ?\n\n• "+nP+" projets (ajout des nouveaux + mise à jour des existants par numéro)\n• "+nB+" bons de livraison\n\nAucune donnée existante n'est effacée. Les employés, équipements, équipes et outils ne sont pas touchés.\n\nFichier généré le "+(d.genere||"?")))return;
+      if(!confirm("Importer la mise à jour par FUSION ?\n\n• "+nP+" projets (ajout des nouveaux + mise à jour des existants par numéro)\n• "+nB+" bons de livraison\n• "+((d.outils||[]).length)+" outils / étalonnages\n\nAucune donnée existante n'est effacée. Les employés, équipements, équipes et outils ne sont pas touchés.\n\nFichier généré le "+(d.genere||"?")))return;
       toast("Import en cours… ne ferme pas la page","ok");
       const r=await rsrMergeImport(d);
       if(typeof refresh==="function")refresh();
       let msg="Import terminé — Projets: "+r.newP+" ajoutés, "+r.updP+" mis à jour • BL: "+r.newB+" ajoutés, "+r.updB+" mis à jour";
       if(r.errB)msg+=" • "+r.errB+" BL en erreur";
+      if(r.newO||r.updO)msg+=" • Outils: "+(r.newO||0)+" ajoutés, "+(r.updO||0)+" mis à jour";
       toast(msg,r.errB?"err":"ok");
       alert(msg);
     }catch(err){toast("Erreur import : "+(err.message||err),"err");alert("Erreur import : "+(err.message||err));}
