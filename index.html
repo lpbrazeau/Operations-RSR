@@ -189,7 +189,7 @@ tbody tr:last-child td{border-bottom:0}
 .pg-week{position:sticky;top:0;z-index:3;background:var(--surface-2);padding:7px 4px;text-align:center;font-family:var(--mono);font-weight:600;color:var(--muted);font-size:11px}
 .pg-week.cur{background:var(--accent-soft);color:var(--accent-d)}
 .pg-week small{display:block;font-size:9px;font-weight:500;opacity:.75;font-family:var(--sans)}
-.sms-prev{white-space:pre-wrap;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12.5px;max-height:220px;overflow:auto;font-family:inherit}.sms-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-2)}.sms-nm{font-weight:600;font-size:13.5px}.sms-as{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sms-act{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.sms-note-fld{margin-bottom:8px}.sms-note-fld label{display:block;font-size:12px;font-weight:600;margin-bottom:3px}.sms-note{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:12.5px;font-family:inherit;resize:vertical}.sms-prev{white-space:pre-wrap;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12.5px;max-height:220px;overflow:auto;font-family:inherit}.sms-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-2)}.sms-nm{font-weight:600;font-size:13.5px}.sms-as{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sms-act{display:flex;gap:6px;align-items:center;flex-shrink:0}
 .anon-choice{display:flex;flex-direction:column;gap:10px;margin:12px 0}.anon-back{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;padding:4px 0;margin-bottom:4px}
 .pg-res[draggable="true"]{cursor:grab}.pg-res.dragging,.pg-sub.eq.dragging{opacity:.45}.pg-sub.eq[draggable="true"]{cursor:grab}.pg-cell.drop-hot{outline:2px dashed var(--accent);outline-offset:-2px;background:rgba(15,118,110,.16)}.planif-actif-lbl{display:inline-flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap}.planif-actif-lbl select{max-width:230px;padding:3px 7px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:12px}
 .pg-res{position:sticky;left:0;z-index:2;background:var(--surface);padding:8px 12px;font-weight:600;display:flex;align-items:center;gap:8px}
@@ -2559,7 +2559,7 @@ async function saveProjet(id,isNew){
     entrees:(DATA.projets.find(p=>p.id===id)?.entrees)||[],
     codes:(DATA.projets.find(p=>p.id===id)?.codes)||[],
     materiaux:(DATA.projets.find(p=>p.id===id)?.materiaux)||[],
-    sousTraitants:(DATA.projets.find(p=>p.id===id)?.sousTraitants)||[],
+    sousTraitants:(DATA.projets.find(p=>p.id===id)?.sousTraitants)||[],dispatchNotes:(DATA.projets.find(p=>p.id===id)?.dispatchNotes)||{},
     createdAt:(DATA.projets.find(p=>p.id===id)?.createdAt)||today(),updatedAt:today()};
   const clientNom=g("m-clientNom").trim();
   rec.clientNom=clientNom;rec.contactNom=g("m-contactNom").trim();rec.contactCourriel=g("m-contactCourriel").trim();rec.contactTel=g("m-contactTel").trim();
@@ -3944,24 +3944,39 @@ function smsAssignsForDay(d){
   return perRes;
 }
 function smsJourLbl(d){const dt=new Date(d+"T00:00:00");return cap(dt.toLocaleDateString("fr-CA",{weekday:"long",day:"numeric",month:"long"}));}
+var SMS_NOTES={};
+function smsNoteGet(pid,d){const k=pid+"|"+d;if(k in SMS_NOTES)return SMS_NOTES[k];const p=DATA.projets.find(x=>x.id===pid);return (p&&p.dispatchNotes&&p.dispatchNotes[d])||"";}
+function smsNoteEdit(pid,d,v){SMS_NOTES[pid+"|"+d]=v;smsRefreshPreview();}
+async function smsNotesSave(d){
+  const touched={};Object.keys(SMS_NOTES).forEach(k=>{const idx=k.lastIndexOf("|");if(k.slice(idx+1)===d)touched[k.slice(0,idx)]=SMS_NOTES[k];});
+  for(const pid of Object.keys(touched)){const p=DATA.projets.find(x=>x.id===pid);if(!p)continue;p.dispatchNotes=p.dispatchNotes||{};if((p.dispatchNotes[d]||"")!==touched[pid]){p.dispatchNotes[d]=touched[pid];try{await idbPut("projets",p);}catch(e){}}}
+}
 function smsGroupText(d){
-  const byProj={};
+  const byProj={};const order=[];
   (DATA.affectations||[]).filter(a=>coversDay(a,d)).forEach(a=>{
     const pr=DATA.projets.find(p=>p.id===a.projetId); const r=DATA.ressources.find(x=>x.id===a.ressourceId);
-    if(!pr||!r)return; if(!byProj[pr.id])byProj[pr.id]={pr,hum:[],mec:[]};
+    if(!pr||!r)return; if(!byProj[pr.id]){byProj[pr.id]={pr,hum:[],mec:[]};order.push(pr.id);}
     if(r.type==="mecanique")byProj[pr.id].mec.push(resNom(r)); else byProj[pr.id].hum.push(r.nom);
   });
   let out="Dispatch "+smsJourLbl(d)+" - Excavations R.S.R.\n";
-  const keys=Object.keys(byProj);
-  if(!keys.length)return out+"\n(Aucune affectation cette journee)";
-  keys.forEach(k=>{const g=byProj[k];out+="\n"+g.pr.numero+" "+g.pr.nom+":\n";[...new Set(g.hum)].forEach(n=>out+="  - "+n+"\n");[...new Set(g.mec)].forEach(n=>out+="  * "+n+"\n");});
+  if(!order.length)return out+"\n(Aucune affectation cette journee)";
+  order.forEach(k=>{const g=byProj[k];out+="\n"+g.pr.numero+" "+g.pr.nom+":\n";const note=smsNoteGet(g.pr.id,d);if(note)note.split(/\n+/).forEach(ln=>{if(ln.trim())out+="  >> "+ln.trim()+"\n";});[...new Set(g.hum)].forEach(n=>out+="  - "+n+"\n");[...new Set(g.mec)].forEach(n=>out+="  * "+n+"\n");});
   return out.trim();
 }
+function smsRefreshPreview(){
+  const d=SMS_DAY;
+  const gp=document.getElementById("sms-group-prev"); if(gp)gp.textContent=smsGroupText(d);
+  const nums=Object.values(smsAssignsForDay(d)).filter(o=>o.res.type==="humaine"&&o.res.tel).map(o=>o.res.tel);
+  const gl=document.getElementById("smslink-group"); if(gl)gl.setAttribute("href",smsHref(nums,smsGroupText(d)));
+  Object.values(smsAssignsForDay(d)).forEach(o=>{if(o.res.type!=="humaine"||!o.res.tel)return;const el=document.getElementById("smslink-"+o.res.id);if(el)el.setAttribute("href",smsHref(o.res.tel,smsPersonText(o.res,d)));});
+}
 function smsPersonText(res,d){
-  const perRes=smsAssignsForDay(d); const me=perRes[res.id];
   const prenom=(res.nom||"").split(" ")[0];
   let out="Salut "+prenom+", ta journee "+smsJourLbl(d)+":\n";
-  if(me&&me.lignes.length)[...new Set(me.lignes)].forEach(l=>out+="- "+l+"\n"); else out+="- (rien d'assigne)\n";
+  const affs=(DATA.affectations||[]).filter(a=>a.ressourceId===res.id&&coversDay(a,d));
+  if(!affs.length)return out+"- (rien d'assigne)\nMerci!";
+  const seen=new Set();
+  affs.forEach(a=>{const pr=DATA.projets.find(p=>p.id===a.projetId);if(!pr||seen.has(pr.id))return;seen.add(pr.id);const c=a.codeId?codeById(a.projetId,a.codeId):null;out+="- "+pr.numero+" "+pr.nom+(c?" · "+c.code:"")+"\n";const note=smsNoteGet(pr.id,d);if(note)note.split(/\n+/).forEach(ln=>{if(ln.trim())out+="  >> "+ln.trim()+"\n";});});
   return out+"Merci!";
 }
 function smsCopy(t){ if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(()=>toast("Message copie","ok"),()=>toast("Copie impossible","err"));} else toast("Copie non supportee","err"); }
@@ -3972,10 +3987,12 @@ function openSmsDispatch(){
   const t=isoLocal(new Date());SMS_DAY=SMS_DAYS.includes(t)?t:SMS_DAYS[0];
   renderSmsModal();
 }
-function smsSetDay(x){SMS_DAY=x;renderSmsModal();}
+function smsSetDay(x){smsNotesSave(SMS_DAY);SMS_DAY=x;renderSmsModal();}
 function renderSmsModal(){
   const d=SMS_DAY;
   const dayChips=SMS_DAYS.map(x=>{const dt=new Date(x+"T00:00:00");return `<button class="chip ${x===d?'on':''}" onclick="smsSetDay('${x}')">${cap(dt.toLocaleDateString('fr-CA',{weekday:'short',day:'numeric'}))}</button>`;}).join("");
+  const dayAffProj=[];(DATA.affectations||[]).filter(a=>coversDay(a,d)).forEach(a=>{if(a.projetId&&!dayAffProj.includes(a.projetId)&&DATA.projets.find(p=>p.id===a.projetId))dayAffProj.push(a.projetId);});
+  const noteFields=dayAffProj.map(pid=>{const pr=DATA.projets.find(p=>p.id===pid);return `<div class="sms-note-fld"><label>${esc(pr.numero+" "+pr.nom)}</label><textarea class="sms-note" rows="2" placeholder="Ce qu'il y a a faire aujourd'hui sur ce chantier…" oninput="smsNoteEdit('${pid}','${d}',this.value)" onchange="smsNotesSave('${d}')">${esc(smsNoteGet(pid,d))}</textarea></div>`;}).join("")||'<div class="muted" style="font-size:12.5px">Aucun chantier cette journee.</div>';
   const perRes=smsAssignsForDay(d);
   const people=Object.values(perRes).filter(o=>o.res.type==='humaine').sort((a,b)=>a.res.nom.localeCompare(b.res.nom));
   const withTel=people.filter(o=>o.res.tel);
@@ -3987,15 +4004,17 @@ function renderSmsModal(){
     return `<div class="sms-row">
       <div style="flex:1;min-width:0"><div class="sms-nm">${esc(r.nom)} ${r.tel?`<span class="muted" style="font-weight:400">${esc(r.tel)}</span>`:'<span style="color:var(--red);font-size:12px">pas de numero</span>'}</div>
       <div class="sms-as">${esc([...new Set(o.lignes)].join(' · '))||'<span class="muted">—</span>'}</div></div>
-      <div class="sms-act">${r.tel?`<a class="btn sm primary" href="${smsHref(r.tel,txt)}">📱 Texter</a>`:''}<button class="btn sm ghost" onclick="smsCopyPerson('${r.id}')">📋</button></div></div>`;
+      <div class="sms-act">${r.tel?`<a class="btn sm primary" id="smslink-${r.id}" href="${smsHref(r.tel,txt)}">📱 Texter</a>`:''}<button class="btn sm ghost" onclick="smsCopyPerson('${r.id}')">📋</button></div></div>`;
   }).join("")||'<div class="muted">Personne d\'assigne cette journee.</div>';
   openModal(`
     <div class="modal-head"><div class="hx"><h2>📱 Envoyer la planif par texto</h2><div class="hs">Choisis la journee — le bouton envoie CETTE journee-la</div></div><button class="x" onclick="closeModal()">×</button></div>
     <div class="modal-body">
       <div class="segbtn" style="flex-wrap:wrap;gap:6px;margin-bottom:14px">${dayChips}</div>
-      <div class="sec-title">Texto de groupe — tout le monde d'un coup</div>
-      <pre class="sms-prev">${esc(groupTxt)}</pre>
-      <div class="sms-act" style="margin:8px 0 4px">${allNums.length?`<a class="btn primary" href="${smsHref(allNums,groupTxt)}">📱 Texter au groupe (${allNums.length})</a>`:'<span class="muted">Aucun numero</span>'}<button class="btn ghost" onclick="smsCopyGroup()">📋 Copier</button></div>
+      <div class="sec-title">Ce qu'ils ont a faire (par chantier)</div>
+      <div class="sms-notes">${noteFields}</div>
+      <div class="sec-title" style="margin-top:16px">Texto de groupe — tout le monde d'un coup</div>
+      <pre class="sms-prev" id="sms-group-prev">${esc(groupTxt)}</pre>
+      <div class="sms-act" style="margin:8px 0 4px">${allNums.length?`<a class="btn primary" id="smslink-group" href="${smsHref(allNums,groupTxt)}">📱 Texter au groupe (${allNums.length})</a>`:'<span class="muted">Aucun numero</span>'}<button class="btn ghost" onclick="smsCopyGroup()">📋 Copier</button></div>
       <div class="sec-title" style="margin-top:18px">Un par un</div>
       <div class="sms-list">${rows}</div>
       ${noTel.length?`<p class="muted" style="font-size:12px;margin-top:10px">⚠ ${noTel.length} employe(s) sans numero — ajoute-le dans leur fiche (onglet Employes).</p>`:''}
