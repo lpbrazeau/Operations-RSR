@@ -3990,9 +3990,15 @@ function smsPersonText(res,d){
   const prenom=(res.nom||"").split(" ")[0];
   let out="Salut "+prenom+", ta journee "+smsJourLbl(d)+":\n";
   const affs=(DATA.affectations||[]).filter(a=>a.ressourceId===res.id&&coversDay(a,d));
-  if(!affs.length)return out+"- (rien d'assigne)\nMerci!";
+  const machAll=(DATA.affectations||[]).filter(a=>a.operateurId===res.id&&coversDay(a,d));
+  if(!affs.length&&!machAll.length)return out+"- (rien d'assigne)\nMerci!";
   const seen=new Set();
-  affs.forEach(a=>{const pr=DATA.projets.find(p=>p.id===a.projetId);if(!pr||seen.has(pr.id))return;seen.add(pr.id);const c=a.codeId?codeById(a.projetId,a.codeId):null;out+="- "+pr.numero+" "+pr.nom+(c?" · "+c.code:"")+"\n";const note=smsNoteGet(pr.id,d);if(note)note.split(/\n+/).forEach(ln=>{if(ln.trim())out+="  >> "+ln.trim()+"\n";});});
+  affs.forEach(a=>{const pr=DATA.projets.find(p=>p.id===a.projetId);if(!pr||seen.has(pr.id))return;seen.add(pr.id);const c=a.codeId?codeById(a.projetId,a.codeId):null;out+="- "+pr.numero+" "+pr.nom+(c?" · "+c.code:"")+"\n";const note=smsNoteGet(pr.id,d);if(note)note.split(/\n+/).forEach(ln=>{if(ln.trim())out+="  >> "+ln.trim()+"\n";});
+    const machs=machAll.filter(x=>x.projetId===pr.id).map(x=>{const m=DATA.ressources.find(r=>r.id===x.ressourceId);return m?resNom(m):null;}).filter(Boolean);
+    [...new Set(machs)].forEach(mn=>out+="  * ta machine : "+mn+"\n");});
+  // machines attribuees sur un projet ou la personne n'a pas d'affectation listee
+  const extra=machAll.filter(x=>!seen.has(x.projetId));
+  if(extra.length){const seenM=new Set();extra.forEach(x=>{const m=DATA.ressources.find(r=>r.id===x.ressourceId);const pr=DATA.projets.find(p=>p.id===x.projetId);if(!m)return;const key=m.id;if(seenM.has(key))return;seenM.add(key);out+="- "+(pr?pr.numero+" "+pr.nom:"")+"\n  * ta machine : "+resNom(m)+"\n";});}
   return out+"Merci!";
 }
 function smsCopy(t){ if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(()=>toast("Message copie","ok"),()=>toast("Copie impossible","err"));} else toast("Copie non supportee","err"); }
