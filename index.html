@@ -4099,7 +4099,7 @@ function renderDispatch(){
       <button class="btn sm ghost" onclick="printDispatch()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg> Imprimer</button>${admin?`<button class="btn sm ghost" onclick="openEquipesManager()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="18" cy="9" r="2.2"/></svg> Équipes</button><button class="btn sm" onclick="newAffectation(null,new Date().getFullYear(),null,null)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Planifier (plusieurs jours)</button>`:''}
       <div style="flex:1"></div><div class="kpi-inline">${projs.length} projet(s) actif(s)</div>
     </div>
-    <div class="db-catfilter"><span class="db-cflabel">🚜 Filtrer :</span><button class="cchip ${!dispCat?'on':''}" onclick="dispCat='';renderDispatch()">Tout</button>${EQUIP_CATS.map(c=>`<button class="cchip ${dispCat===c?'on':''}" style="${dispCat===c?`background:${catColor(c)};color:#fff;border-color:${catColor(c)}`:`color:${catColor(c)};border-color:${catColor(c)}`}" onclick="dispCat='${c}';renderDispatch()">${c}</button>`).join("")}</div>
+    
     ${DISP_CLIP?`<div class="disp-clip">📋 <b>${esc(DISP_CLIP.name)}</b> copié — clique une case-jour pour le coller (Échap pour annuler) <button class="btn sm ghost" onclick="dispCancelCopy()">Annuler</button></div>`:''}
     <div class="db-wrap"><div class="db-board">
       <div class="db-head">Projet</div>${dnames.map(n=>`<div class="db-dh">${esc(n)}</div>`).join("")}
@@ -4136,7 +4136,7 @@ function openDispatchAssign(projetId,date,affId,preCode){
       <div class="da-eqlist">${eqCheck||'<div class="muted" style="font-size:12.5px">Aucun équipement.</div>'}</div>
     </div>
     </div>
-    <div class="modal-foot">${ex?`<button class="btn danger" onclick="removeDispatch('${ex.id}')">Retirer</button>`:''}<div class="spacer"></div><button class="btn" onclick="closeModal()">Annuler</button><button class="btn primary" onclick="saveDispatchAssign('${projetId}','${date}','${affId||''}')">${ex?'Enregistrer':'Ajouter'}</button></div>
+    <div class="modal-foot">${ex?`<button class="btn danger" onclick="removeDispatchDay('${ex.id}','${date}')">Retirer</button>`:''}<div class="spacer"></div><button class="btn" onclick="closeModal()">Annuler</button><button class="btn primary" onclick="saveDispatchAssign('${projetId}','${date}','${affId||''}')">${ex?'Enregistrer':'Ajouter'}</button></div>
   `);
   daResChange();
 }
@@ -4180,6 +4180,23 @@ async function saveDispatchAssign(projetId,date,affId){
 }
 
 async function removeDispatch(id){await idbDel("affectations",id);await loadAll();closeModal&&closeModal();toast("Retiré du dispatch","info");renderDispatch();}
+async function removeDispatchDay(id,date){
+  const a=(DATA.affectations||[]).find(x=>x.id===id);
+  if(!a){closeModal&&closeModal();return;}
+  const deb=a.dateDebut,fin=a.dateFin||a.dateDebut;
+  const addD=(iso,n)=>{const dt=new Date(iso+"T00:00:00");dt.setDate(dt.getDate()+n);return isoLocal(dt);};
+  if(!deb||!date||deb===fin||!(deb<=date&&date<=fin)){
+    await idbDel("affectations",id);
+  }else if(date===deb){
+    a.dateDebut=addD(date,1);await idbPut("affectations",a);
+  }else if(date===fin){
+    a.dateFin=addD(date,-1);await idbPut("affectations",a);
+  }else{
+    const after=Object.assign({},a,{id:uid("a"),dateDebut:addD(date,1),dateFin:fin});
+    a.dateFin=addD(date,-1);await idbPut("affectations",a);await idbPut("affectations",after);
+  }
+  await loadAll();closeModal&&closeModal();toast("Retiré de cette journée seulement","info");renderDispatch();
+}
 /* ==================================================================
    FEUILLES DE TEMPS (approbation hebdo des pointages)
    ================================================================== */
