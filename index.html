@@ -1068,7 +1068,7 @@ const COL_CATALOG=[
   {key:"prodReel",label:"Production réelle",r:1,render:p=>fmtNum(p.productionReelle)},
   {key:"coutEst",label:"Coût estimé",r:1,render:p=>fmtMoney(p.coutEstime)},
   {key:"coutReel",label:"Coût réel",r:1,render:p=>fmtMoney(p.coutReel)},
-  {key:"coutPlan",label:"Coût planif (réel)",r:1,render:p=>`<span class="mono">${fmtMoney(projCouts(p.id).reel)}</span>`},
+  {key:"coutPlan",label:"Coût planifié (dispatch)",r:1,render:p=>`<span class="mono">${fmtMoney(projCouts(p.id).plan)}</span>`},
   {key:"coutMat",label:"Coût matériaux",r:1,render:p=>fmtMoney(projCouts(p.id).reelMat)},
   {key:"margeEst",label:"Marge est. (%)",r:1,render:p=>fmtPct(margeEstPct(p))},
   {key:"margeReel",label:"Marge réel (%)",r:1,render:p=>{const v=margeReelPct(p);return `<span style="color:${v!=null&&v<0?'var(--red)':'inherit'}">${fmtPct(v)}</span>`;}},
@@ -1083,7 +1083,7 @@ const COL_CATALOG=[
   {key:"suivi",label:"Note de suivi",render:p=>`<span class="muted" style="display:inline-block;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom">${esc(p.noteSuivi||"")}</span>`},
 ];
 const DEFAULT_COLS_SOUM=["client","statut","depot","prixSoum","margeEst","mdoProj","suivi"];
-const DEFAULT_COLS_PROJ=["client","statut","exec","octroie","mdo","margeEst","margeReel","avancCout","facture","avancement","equipe"];
+const DEFAULT_COLS_PROJ=["client","statut","exec","octroie","mdo","coutPlan","margeEst","margeReel","avancCout","facture","avancement","equipe"];
 let COLS={soum:DEFAULT_COLS_SOUM.slice(),projets:DEFAULT_COLS_PROJ.slice()};
 function resolveCols(keys){const out=[COL_CATALOG.find(c=>c.always)];COL_CATALOG.forEach(c=>{if(!c.always&&keys.includes(c.key))out.push(c);});return out;}
 function nOr(v){return (v==null||v==="")?null:(Number(v)||0);}
@@ -1215,7 +1215,7 @@ async function loadAll(){
   DATA.formulaires=await idbAll("formulaires");
   DATA.fournisseurs=await idbAll("fournisseurs");
   DATA.outils=await idbAll("outils");
-  try{const cs=await idbGet("meta","cols_soum");if(cs&&cs.keys)COLS.soum=cs.keys;const cpj=await idbGet("meta","cols_projets");if(cpj&&cpj.keys)COLS.projets=cpj.keys;}catch(e){}
+  try{const cs=await idbGet("meta","cols_soum");if(cs&&cs.keys)COLS.soum=cs.keys;const cpj=await idbGet("meta","cols_projets");if(cpj&&cpj.keys)COLS.projets=cpj.keys.includes("coutPlan")?cpj.keys:cpj.keys.concat(["coutPlan"]);}catch(e){}
   DATA.projets.sort((a,b)=>(b.numero||"").localeCompare(a.numero||""));
   DATA.ressources.sort((a,b)=>a.nom.localeCompare(b.nom));
 }
@@ -2511,7 +2511,7 @@ function openProjet(id){
         <div class="cost-cell"><div class="l">Heures planifiées</div><div class="v">${fmtNum(pc.hPlan)} h</div><div class="s">réel : ${fmtNum(pc.hReel)} h</div></div>
         <div class="cost-cell"><div class="l">Coût main d'œuvre</div><div class="v">${fmtMoney(pc.planMO)}</div><div class="s">réel : ${fmtMoney(pc.reelMO)}</div></div>
         <div class="cost-cell"><div class="l">Coût équipement</div><div class="v">${fmtMoney(pc.planEQ)}</div><div class="s">réel : ${fmtMoney(pc.reelEQ)}</div></div>
-        <div class="cost-cell"><div class="l">Matériaux (BL)</div><div class="v">${fmtMoney(pc.reelMat)}</div><div class="s">réel</div></div>
+        <div class="cost-cell" onclick="openProjetMateriaux('${d.id}')" style="cursor:pointer" title="Clique pour voir les BL / matériaux de ce projet"><div class="l">Matériaux (BL) ›</div><div class="v">${fmtMoney(pc.reelMat)}</div><div class="s" style="color:var(--accent)">voir les BL ›</div></div>
         <div class="cost-cell tot"><div class="l">Total planifié</div><div class="v">${fmtMoney(pc.plan)}</div><div class="s">réel à ce jour : <b>${fmtMoney(pc.reel)}</b></div></div>
       </div>
       ${renderCoutDetail(d.id)}`:""}
@@ -3101,6 +3101,12 @@ async function importBons(){
 }
 function matSortBy(k){const f=filters.mat;if(f.sortKey===k){if(f.sortDir==="asc")f.sortDir="desc";else{f.sortKey=null;f.sortDir="asc";}}else{f.sortKey=k;f.sortDir="asc";}renderMateriaux();}
 function matHead(){const f=filters.mat;return MAT_COLS.map(c=>{const active=f.sortKey===c.k;const ind=active?(f.sortDir==="desc"?'<span class="sarrow">▼</span>':'<span class="sarrow">▲</span>'):'<span class="sortdim">⇅</span>';return `<th class="${c.r?'r':''} sortable" onclick="matSortBy('${c.k}')">${esc(c.label)} ${ind}</th>`;}).join("");}
+function openProjetMateriaux(pid){
+  if(typeof closeModal==="function")closeModal();
+  if(!filters.mat)filters.mat={};
+  filters.mat.projet=pid;filters.mat.code="";filters.mat.mois="";filters.mat.q="";
+  setView("materiaux");
+}
 function renderMateriaux(){
   const f=filters.mat;
   let bons=(DATA.bons||[]).slice();
