@@ -189,7 +189,7 @@ tbody tr:last-child td{border-bottom:0}
 .pg-week{position:sticky;top:0;z-index:3;background:var(--surface-2);padding:7px 4px;text-align:center;font-family:var(--mono);font-weight:600;color:var(--muted);font-size:11px}
 .pg-week.cur{background:var(--accent-soft);color:var(--accent-d)}
 .pg-week small{display:block;font-size:9px;font-weight:500;opacity:.75;font-family:var(--sans)}
-.sms-note-fld{margin-bottom:8px}.sms-note-fld label{display:block;font-size:12px;font-weight:600;margin-bottom:3px}.sms-note{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:12.5px;font-family:inherit;resize:vertical}.sms-team{border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin-bottom:10px}.sms-team-h{font-size:13px;margin-bottom:6px}.sms-prev{white-space:pre-wrap;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12.5px;max-height:220px;overflow:auto;font-family:inherit}.sms-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-2)}.sms-nm{font-weight:600;font-size:13.5px}.sms-as{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sms-act{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.sms-note-fld{margin-bottom:10px}.sms-note-proj{font-weight:600;font-size:12px;margin-bottom:4px}.sms-note-sub{margin:0 0 6px 0}.sms-note-sub label{display:block;font-size:11px;font-weight:500;color:var(--muted);margin:0 0 2px 2px}.sms-note-fld label{display:block;font-size:12px;font-weight:600;margin-bottom:3px}.sms-note{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:12.5px;font-family:inherit;resize:vertical}.sms-team{border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin-bottom:10px}.sms-team-h{font-size:13px;margin-bottom:6px}.sms-prev{white-space:pre-wrap;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12.5px;max-height:220px;overflow:auto;font-family:inherit}.sms-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-2)}.sms-nm{font-weight:600;font-size:13.5px}.sms-as{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sms-act{display:flex;gap:6px;align-items:center;flex-shrink:0}
 .anon-choice{display:flex;flex-direction:column;gap:10px;margin:12px 0}.anon-back{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;padding:4px 0;margin-bottom:4px}
 .pg-res[draggable="true"]{cursor:grab}.pg-res.dragging,.pg-sub.eq.dragging{opacity:.45}.pg-sub.eq[draggable="true"]{cursor:grab}.pg-cell.drop-hot{outline:2px dashed var(--accent);outline-offset:-2px;background:rgba(15,118,110,.16)}.planif-actif-lbl{display:inline-flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap}.planif-actif-lbl select{max-width:230px;padding:3px 7px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:12px}
 .pg-res{position:sticky;left:0;z-index:2;background:var(--surface);padding:8px 12px;font-weight:600;display:flex;align-items:center;gap:8px}
@@ -3945,11 +3945,13 @@ function smsAssignsForDay(d){
 }
 function smsJourLbl(d){const dt=new Date(d+"T00:00:00");return cap(dt.toLocaleDateString("fr-CA",{weekday:"long",day:"numeric",month:"long"}));}
 var SMS_NOTES={};
-function smsNoteGet(pid,d){const k=pid+"|"+d;if(k in SMS_NOTES)return SMS_NOTES[k];const p=DATA.projets.find(x=>x.id===pid);return (p&&p.dispatchNotes&&p.dispatchNotes[d])||"";}
-function smsNoteEdit(pid,d,v){SMS_NOTES[pid+"|"+d]=v;smsRefreshPreview();}
+function smsNoteKey(d,ck){return (ck&&ck!=="__none__")?(d+"|"+ck):d;}
+function smsNoteGet(pid,d,ck){const nk=smsNoteKey(d,ck);const sk=pid+"@@"+nk;if(sk in SMS_NOTES)return SMS_NOTES[sk];const p=DATA.projets.find(x=>x.id===pid);return (p&&p.dispatchNotes&&p.dispatchNotes[nk])||"";}
+function smsNoteEdit(pid,d,ck,v){SMS_NOTES[pid+"@@"+smsNoteKey(d,ck)]=v;smsRefreshPreview();}
 async function smsNotesSave(d){
-  const touched={};Object.keys(SMS_NOTES).forEach(k=>{const idx=k.lastIndexOf("|");if(k.slice(idx+1)===d)touched[k.slice(0,idx)]=SMS_NOTES[k];});
-  for(const pid of Object.keys(touched)){const p=DATA.projets.find(x=>x.id===pid);if(!p)continue;p.dispatchNotes=p.dispatchNotes||{};if((p.dispatchNotes[d]||"")!==touched[pid]){p.dispatchNotes[d]=touched[pid];try{await idbPut("projets",p);}catch(e){}}}
+  const byProj={};
+  Object.keys(SMS_NOTES).forEach(sk=>{const idx=sk.indexOf("@@");if(idx<0)return;const pid=sk.slice(0,idx);const nk=sk.slice(idx+2);if(nk.split("|")[0]!==d)return;(byProj[pid]=byProj[pid]||{})[nk]=SMS_NOTES[sk];});
+  for(const pid of Object.keys(byProj)){const p=DATA.projets.find(x=>x.id===pid);if(!p)continue;p.dispatchNotes=p.dispatchNotes||{};let ch=false;Object.keys(byProj[pid]).forEach(nk=>{if((p.dispatchNotes[nk]||"")!==byProj[pid][nk]){p.dispatchNotes[nk]=byProj[pid][nk];ch=true;}});if(ch){try{await idbPut("projets",p);}catch(e){}}}
 }
 function smsDispatchText(d,memberSet,title){
   const byProj={};const order=[];
@@ -3969,11 +3971,12 @@ function smsDispatchText(d,memberSet,title){
   order.forEach(pid=>{
     const P=byProj[pid];
     out+="\n"+P.pr.numero+" "+P.pr.nom+":\n";
-    const note=smsNoteGet(pid,d);if(note)note.split(/\n+/).forEach(ln=>{if(ln.trim())out+="  >> "+ln.trim()+"\n";});
+    const note=smsNoteGet(pid,d,"__none__");if(note)note.split(/\n+/).forEach(ln=>{if(ln.trim())out+="  >> "+ln.trim()+"\n";});
     P.gorder.forEach(key=>{
       const g=P.groups[key];
       if(g.label)out+="  ["+g.label+"]\n";
       const ind=g.label?"    ":"  ";
+      if(key!=="__none__"){const cn=smsNoteGet(pid,d,key);if(cn)cn.split(/\n+/).forEach(ln=>{if(ln.trim())out+=ind+">> "+ln.trim()+"\n";});}
       [...new Set(g.hum)].forEach(n=>out+=ind+"- "+n+"\n");
       [...new Set(g.mec)].forEach(n=>out+=ind+"* "+n+"\n");
     });
@@ -4005,12 +4008,11 @@ function smsPersonText(res,d){
   const machAll=(DATA.affectations||[]).filter(a=>a.operateurId===res.id&&coversDay(a,d));
   if(!affs.length&&!machAll.length)return out+"- (rien d'assigne)\nMerci!";
   const seen=new Set();
-  affs.forEach(a=>{const pr=DATA.projets.find(p=>p.id===a.projetId);if(!pr||seen.has(pr.id))return;seen.add(pr.id);const c=a.codeId?codeById(a.projetId,a.codeId):null;out+="- "+pr.numero+" "+pr.nom+(c?" · "+c.code:"")+"\n";const note=smsNoteGet(pr.id,d);if(note)note.split(/\n+/).forEach(ln=>{if(ln.trim())out+="  >> "+ln.trim()+"\n";});
-    const machs=machAll.filter(x=>x.projetId===pr.id).map(x=>{const m=DATA.ressources.find(r=>r.id===x.ressourceId);return m?resNom(m):null;}).filter(Boolean);
+  affs.forEach(a=>{const pr=DATA.projets.find(p=>p.id===a.projetId);if(!pr)return;const ck=a.codeId||"__none__";const sk=pr.id+"|"+ck;if(seen.has(sk))return;seen.add(sk);const c=a.codeId?codeById(a.projetId,a.codeId):null;out+="- "+pr.numero+" "+pr.nom+(c?" · "+c.code:"")+"\n";const note=smsNoteGet(pr.id,d,ck);if(note)note.split(/\n+/).forEach(ln=>{if(ln.trim())out+="  >> "+ln.trim()+"\n";});
+    const machs=machAll.filter(x=>x.projetId===pr.id&&((x.codeId||"__none__")===ck)).map(x=>{const m=DATA.ressources.find(r=>r.id===x.ressourceId);return m?resNom(m):null;}).filter(Boolean);
     [...new Set(machs)].forEach(mn=>out+="  * ta machine : "+mn+"\n");});
-  // machines attribuees sur un projet ou la personne n'a pas d'affectation listee
-  const extra=machAll.filter(x=>!seen.has(x.projetId));
-  if(extra.length){const seenM=new Set();extra.forEach(x=>{const m=DATA.ressources.find(r=>r.id===x.ressourceId);const pr=DATA.projets.find(p=>p.id===x.projetId);if(!m)return;const key=m.id;if(seenM.has(key))return;seenM.add(key);out+="- "+(pr?pr.numero+" "+pr.nom:"")+"\n  * ta machine : "+resNom(m)+"\n";});}
+  const extra=machAll.filter(x=>!seen.has(x.projetId+"|"+(x.codeId||"__none__")));
+  if(extra.length){const seenM=new Set();extra.forEach(x=>{const m=DATA.ressources.find(r=>r.id===x.ressourceId);const pr=DATA.projets.find(p=>p.id===x.projetId);if(!m||seenM.has(m.id))return;seenM.add(m.id);out+="- "+(pr?pr.numero+" "+pr.nom:"")+"\n  * ta machine : "+resNom(m)+"\n";});}
   return out+"Merci!";
 }
 function smsCopy(t){ if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(()=>toast("Message copie","ok"),()=>toast("Copie impossible","err"));} else toast("Copie non supportee","err"); }
@@ -4025,8 +4027,8 @@ function smsSetDay(x){smsNotesSave(SMS_DAY);SMS_DAY=x;renderSmsModal();}
 function renderSmsModal(){
   const d=SMS_DAY;
   const dayChips=SMS_DAYS.map(x=>{const dt=new Date(x+"T00:00:00");return `<button class="chip ${x===d?'on':''}" onclick="smsSetDay('${x}')">${cap(dt.toLocaleDateString('fr-CA',{weekday:'short',day:'numeric'}))}</button>`;}).join("");
-  const dayAffProj=[];(DATA.affectations||[]).filter(a=>coversDay(a,d)).forEach(a=>{if(a.projetId&&!dayAffProj.includes(a.projetId)&&DATA.projets.find(p=>p.id===a.projetId))dayAffProj.push(a.projetId);});
-  const noteFields=dayAffProj.map(pid=>{const pr=DATA.projets.find(p=>p.id===pid);return `<div class="sms-note-fld"><label>${esc(pr.numero+" "+pr.nom)}</label><textarea class="sms-note" rows="2" placeholder="Ce qu'il y a a faire aujourd'hui sur ce chantier…" oninput="smsNoteEdit('${pid}','${d}',this.value)" onchange="smsNotesSave('${d}')">${esc(smsNoteGet(pid,d))}</textarea></div>`;}).join("")||'<div class="muted" style="font-size:12.5px">Aucun chantier cette journee.</div>';
+  const dayPC={};const pcOrder=[];(DATA.affectations||[]).filter(a=>coversDay(a,d)).forEach(a=>{const pr=DATA.projets.find(p=>p.id===a.projetId);if(!pr)return;if(!dayPC[a.projetId]){dayPC[a.projetId]=[];pcOrder.push(a.projetId);}const ck=a.codeId||"__none__";if(!dayPC[a.projetId].includes(ck))dayPC[a.projetId].push(ck);});
+  const noteFields=pcOrder.map(pid=>{const pr=DATA.projets.find(p=>p.id===pid);const keys=dayPC[pid];const subs=keys.map(ck=>{const isNone=(ck==="__none__");const c=isNone?null:codeById(pid,ck);const lbl=isNone?(keys.length>1?"(sans code)":""):(c?(c.code+(c.nom?" "+c.nom:"")):ck);return `<div class="sms-note-sub">${lbl?`<label>${esc(lbl)}</label>`:''}<textarea class="sms-note" rows="2" placeholder="Ce qu'il y a a faire…" oninput="smsNoteEdit('${pid}','${d}','${ck}',this.value)" onchange="smsNotesSave('${d}')">${esc(smsNoteGet(pid,d,ck))}</textarea></div>`;}).join("");return `<div class="sms-note-fld"><div class="sms-note-proj">${esc(pr.numero+" "+pr.nom)}</div>${subs}</div>`;}).join("")||'<div class="muted" style="font-size:12.5px">Aucun chantier cette journee.</div>';
   const perRes=smsAssignsForDay(d);
   const people=Object.values(perRes).filter(o=>o.res.type==='humaine').sort((a,b)=>a.res.nom.localeCompare(b.res.nom));
   const withTel=people.filter(o=>o.res.tel);
