@@ -3955,12 +3955,28 @@ function smsGroupText(d){
   const byProj={};const order=[];
   (DATA.affectations||[]).filter(a=>coversDay(a,d)).forEach(a=>{
     const pr=DATA.projets.find(p=>p.id===a.projetId); const r=DATA.ressources.find(x=>x.id===a.ressourceId);
-    if(!pr||!r)return; if(!byProj[pr.id]){byProj[pr.id]={pr,hum:[],mec:[]};order.push(pr.id);}
-    if(r.type==="mecanique")byProj[pr.id].mec.push(resNom(r)); else byProj[pr.id].hum.push(r.nom);
+    if(!pr||!r)return;
+    if(!byProj[pr.id]){byProj[pr.id]={pr,groups:{},gorder:[]};order.push(pr.id);}
+    const P=byProj[pr.id];
+    const c=a.codeId?codeById(a.projetId,a.codeId):null;
+    const key=c?c.id:"__none__"; const label=c?(c.code+(c.nom?" "+c.nom:"")):"";
+    if(!P.groups[key]){P.groups[key]={label,hum:[],mec:[]};P.gorder.push(key);}
+    if(r.type==="mecanique")P.groups[key].mec.push(resNom(r)); else P.groups[key].hum.push(r.nom);
   });
   let out="Dispatch "+smsJourLbl(d)+" - Excavations R.S.R.\n";
   if(!order.length)return out+"\n(Aucune affectation cette journee)";
-  order.forEach(k=>{const g=byProj[k];out+="\n"+g.pr.numero+" "+g.pr.nom+":\n";const note=smsNoteGet(g.pr.id,d);if(note)note.split(/\n+/).forEach(ln=>{if(ln.trim())out+="  >> "+ln.trim()+"\n";});[...new Set(g.hum)].forEach(n=>out+="  - "+n+"\n");[...new Set(g.mec)].forEach(n=>out+="  * "+n+"\n");});
+  order.forEach(pid=>{
+    const P=byProj[pid];
+    out+="\n"+P.pr.numero+" "+P.pr.nom+":\n";
+    const note=smsNoteGet(pid,d);if(note)note.split(/\n+/).forEach(ln=>{if(ln.trim())out+="  >> "+ln.trim()+"\n";});
+    P.gorder.forEach(key=>{
+      const g=P.groups[key];
+      if(g.label)out+="  ["+g.label+"]\n";
+      const ind=g.label?"    ":"  ";
+      [...new Set(g.hum)].forEach(n=>out+=ind+"- "+n+"\n");
+      [...new Set(g.mec)].forEach(n=>out+=ind+"* "+n+"\n");
+    });
+  });
   return out.trim();
 }
 function smsRefreshPreview(){
