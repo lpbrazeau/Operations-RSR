@@ -2042,7 +2042,7 @@ function renderEquipement(){
     <div class="toolbar">${chips}<div style="flex:1"></div>
       <select class="filter" onchange="filters.equip.sort=this.value;renderEquipement()"><option value="nom-asc" ${f.sort==='nom-asc'?'selected':''}>Nom A→Z</option><option value="nom-desc" ${f.sort==='nom-desc'?'selected':''}>Nom Z→A</option><option value="cat" ${f.sort==='cat'?'selected':''}>Catégorie</option><option value="taux-desc" ${f.sort==='taux-desc'?'selected':''}>Taux (haut→bas)</option><option value="compteur-desc" ${f.sort==='compteur-desc'?'selected':''}>Compteur (haut→bas)</option></select>
       <button class="btn sm ghost" onclick="openCatManager()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h18"/><circle cx="6" cy="7" r="0"/></svg> Catégories</button>
-      <button class="btn sm ghost" onclick="showEquipQR()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M20 14v.01M14 20v.01M20 20v.01M17 17h.01"/></svg> Code QR</button>
+      <button class="btn sm ghost" onclick="showEquipListQR()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M20 14v.01M14 20v.01M20 20v.01M17 17h.01"/></svg> Code QR</button>
       <button class="btn sm" onclick="openRessource(null,'mecanique')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Équipement</button></div>
     <div class="res-grid">${list.map(resCard).join("")||'<div class="empty">Aucun équipement</div>'}</div>`;
   $$("#view-equipement .chip").forEach(c=>c.onclick=()=>{filters.equip.cat=c.dataset.c;renderEquipement();});
@@ -4365,7 +4365,7 @@ function generateProjetReport(){
   $("#route-preview").classList.add("open");closeModal();
 }
 
-async function showEquipQR(){
+async function showEquipListQR(){
   const url=location.href.replace(/#.*$/,"")+"#equipement";
   const ov=$("#route-preview");
   ov.innerHTML=`
