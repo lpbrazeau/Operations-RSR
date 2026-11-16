@@ -189,6 +189,7 @@ tbody tr:last-child td{border-bottom:0}
 .pg-week{position:sticky;top:0;z-index:3;background:var(--surface-2);padding:7px 4px;text-align:center;font-family:var(--mono);font-weight:600;color:var(--muted);font-size:11px}
 .pg-week.cur{background:var(--accent-soft);color:var(--accent-d)}
 .pg-week small{display:block;font-size:9px;font-weight:500;opacity:.75;font-family:var(--sans)}
+.anon-choice{display:flex;flex-direction:column;gap:10px;margin:12px 0}.anon-back{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;padding:4px 0;margin-bottom:4px}
 .pg-res[draggable="true"]{cursor:grab}.pg-res.dragging,.pg-sub.eq.dragging{opacity:.45}.pg-sub.eq[draggable="true"]{cursor:grab}.pg-cell.drop-hot{outline:2px dashed var(--accent);outline-offset:-2px;background:rgba(15,118,110,.16)}.planif-actif-lbl{display:inline-flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap}.planif-actif-lbl select{max-width:230px;padding:3px 7px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:12px}
 .pg-res{position:sticky;left:0;z-index:2;background:var(--surface);padding:8px 12px;font-weight:600;display:flex;align-items:center;gap:8px}
 .pg-res .rmini{width:9px;height:9px;border-radius:3px;flex:0 0 auto}
@@ -1822,7 +1823,7 @@ function openInspectionPrint(inspId){
     <div class="route-body">
       <div class="route-header"><div class="rh-brand"><img src="${RSR_LOGO}" class="hdr-logo" alt="Excavations R.S.R."></div><div class="rh-title">Rapport d'inspection pré-travail</div></div>
       <table class="ins-meta"><tr><td class="k">Équipement</td><td>${eq?esc(eq.nom):"?"}${eq&&eq.categorie?" — "+esc(eq.categorie):""}</td><td class="k">Date</td><td>${fmtDateTime(ins.date)}</td></tr>
-        <tr><td class="k">Opérateur</td><td>${emp?esc(emp.nom):"?"}</td><td class="k">Compteur</td><td>${ins.compteur!=null?fmtNum(ins.compteur)+" "+(km?"km":"h"):"—"}</td></tr></table>
+        <tr><td class="k">Opérateur</td><td>${emp?esc(emp.nom):(ins.rapporteurNom?esc(ins.rapporteurNom):"?")}</td><td class="k">Compteur</td><td>${ins.compteur!=null?fmtNum(ins.compteur)+" "+(km?"km":"h"):"—"}</td></tr></table>
       <table class="ins-table"><thead><tr><th>Point de vérification</th><th>État</th></tr></thead><tbody>${rows}</tbody></table>
       ${ins.note?`<div class="ins-note"><b>Remarques :</b> ${esc(ins.note)}</div>`:""}
       <div class="ins-verdict ${bad?"bad":"good"}">${bad?"⚠ DÉFAUT(S) CONSTATÉ(S)":"✓ CONFORME"}</div>
@@ -2648,7 +2649,7 @@ function openRessource(id,defType){
         const proj=null;
         return `<div class="dentry">
           <div class="di" style="background:${bad?'var(--red)':'var(--green)'}22"><span style="width:10px;height:10px;border-radius:3px;background:${bad?'var(--red)':'var(--green)'};display:inline-block"></span></div>
-          <div class="dc"><div class="dt">${fmtDateTime(ins.date)} · ${esc(emp?emp.nom:'?')} ${bad?'<span style="color:var(--red);font-weight:700">· DÉFAUT</span>':'<span style="color:var(--green)">· conforme</span>'}</div>
+          <div class="dc"><div class="dt">${fmtDateTime(ins.date)} · ${esc(emp?emp.nom:(ins.rapporteurNom||'?'))} ${bad?'<span style="color:var(--red);font-weight:700">· DÉFAUT</span>':'<span style="color:var(--green)">· conforme</span>'}</div>
             <div class="dm">${ins.compteur!=null?'Compteur : <b>'+fmtNum(ins.compteur)+'</b> ':''}${defauts.length?'· Défauts : '+defauts.map(x=>esc(x.label)).join(', '):''}${ins.note?' · '+esc(ins.note):''}</div></div>
           <button class="ins-pdf" title="Rapport PDF" onclick="event.stopPropagation();openInspectionPrint('${ins.id}')">PDF</button>
         </div>`;}).join("")||'<div class="muted" style="font-size:12.5px">Aucune inspection encore. Elles se créent automatiquement au pointage avec cet équipement.</div>'}</div>`:''}
@@ -3257,7 +3258,7 @@ function printEquipInspectionsMonth(eqId,ym){
   const blocks=list.map((ins,idx)=>{const emp=DATA.ressources.find(r=>r.id===ins.ressourceId);const bad=(ins.items||[]).some(x=>x.etat==="defaut")||ins.conforme===false;
     const rows=(ins.items||[]).map(it=>`<tr><td>${esc(it.label)}</td><td class="ie ${it.etat}">${it.etat==="ok"?"✓ OK":it.etat==="defaut"?"✗ DÉFAUT":"N/A"}</td></tr>`).join("");
     return `<div class="mrg-item${idx>0?' brk':''}"><div class="mrg-h">Inspection pré-travail — ${fmtDate((ins.date||"").slice(0,10))}</div>
-      <table class="ins-meta"><tr><td class="k">Équipement</td><td>${eq?esc(resNom(eq)):"?"}</td><td class="k">Opérateur</td><td>${emp?esc(emp.nom):"?"}</td></tr>
+      <table class="ins-meta"><tr><td class="k">Équipement</td><td>${eq?esc(resNom(eq)):"?"}</td><td class="k">Opérateur</td><td>${emp?esc(emp.nom):(ins.rapporteurNom?esc(ins.rapporteurNom):"?")}</td></tr>
       <tr><td class="k">Date/heure</td><td>${fmtDateTime(ins.date)}</td><td class="k">Compteur</td><td>${ins.compteur!=null?fmtNum(ins.compteur)+" "+(km?"km":"h"):"—"}</td></tr></table>
       <table class="ins-table"><thead><tr><th>Point de vérification</th><th>État</th></tr></thead><tbody>${rows}</tbody></table>
       ${ins.note?`<div class="ins-note"><b>Remarques :</b> ${esc(ins.note)}</div>`:""}
@@ -3453,14 +3454,27 @@ function checkReportHash(){
   const eqId=p.report,eqNom=p.n||"Équipement";window.__anon={eqId,eqNom,u:p.u||"",k:p.k||""};
   document.body.innerHTML=`<div class="anon-wrap"><div class="anon-card">
     <div class="gate-brand"><img src="${RSR_LOGO}" class="hdr-logo" alt="Excavations R.S.R."></div>
-    <h2 style="margin:6px 0 2px">Signaler un problème</h2>
-    <div class="anon-eq">🚜 ${esc(eqNom)}</div>
-    <div id="anon-body">
+    <h2 style="margin:6px 0 2px">${esc(eqNom)}</h2>
+    <div class="anon-eq">🚜 Choisis une action</div>
+    <div id="anon-choice" class="anon-choice">
+      <button class="btn primary block" onclick="anonShow('bris')">⚠ Signaler un bris / une info</button>
+      <button class="btn primary block" style="background:var(--navy,#1e293b)" onclick="anonShow('insp')">🔍 Faire l\'inspection pré-travail</button>
+    </div>
+    <div id="anon-body" style="display:none">
+      <button class="anon-back" onclick="anonShow('')">‹ Retour</button>
       <label>Type</label><select id="an-type"><option value="bris">Bris / défectuosité</option><option value="info">Information</option></select>
       <label>Description</label><textarea id="an-desc" rows="4" placeholder="Décris le bris ou l'info…"></textarea>
       <label>Photo (optionnel)</label><input type="file" accept="image/*" id="an-photo">
       <label>Ton nom (optionnel)</label><input id="an-nom" placeholder="Anonyme">
       <button class="btn primary block" id="an-go" onclick="submitAnonReport()">Envoyer le signalement</button>
+    </div>
+    <div id="anon-insp" style="display:none">
+      <button class="anon-back" onclick="anonShow('')">‹ Retour</button>
+      <label>Compteur / odomètre (optionnel)</label><input type="number" step="0.1" id="ai-compteur" placeholder="lecture actuelle">
+      <div class="insp-list" style="margin:6px 0">${INSPECT_ITEMS.map((it,i)=>`<div class="insp-row"><div class="il-lbl">${esc(it)}</div><div class="il-opts"><label class="ok"><input type="radio" name="ains${i}" value="ok" checked> OK</label><label class="df"><input type="radio" name="ains${i}" value="defaut"> Défaut</label><label class="na"><input type="radio" name="ains${i}" value="na"> N/A</label></div></div>`).join("")}</div>
+      <label>Note (défauts observés, remarques…)</label><input id="ai-note" placeholder="Optionnel">
+      <label>Ton nom (optionnel)</label><input id="ai-nom" placeholder="Anonyme">
+      <button class="btn primary block" id="ai-go" onclick="submitAnonInspection()">Envoyer l\'inspection</button>
     </div>
   </div></div>`;
   return true;
@@ -3476,6 +3490,34 @@ async function submitAnonReport(){
     else{await openDB();await idbPut("tickets",ticket);}
     document.getElementById("anon-body").innerHTML='<div class="anon-ok">✓ Merci!<br><span style="font-size:13px;font-weight:400;color:#889">Ton signalement a été envoyé à l\'atelier.</span></div>';
   }catch(e){btn.disabled=false;btn.textContent="Réessayer";document.getElementById("anon-body").insertAdjacentHTML("afterbegin",`<div class="gate-err">Erreur : ${(e.message||e)}</div>`);}
+}
+function anonShow(which){
+  const c=document.getElementById("anon-choice"),b=document.getElementById("anon-body"),i=document.getElementById("anon-insp");
+  if(c)c.style.display=which?"none":"";
+  if(b)b.style.display=which==="bris"?"":"none";
+  if(i)i.style.display=which==="insp"?"":"none";
+}
+async function submitAnonInspection(){
+  const a=window.__anon||{};
+  const items=INSPECT_ITEMS.map((it,i)=>({label:it,etat:(document.querySelector(`input[name="ains${i}"]:checked`)||{}).value||"ok"}));
+  const cv=document.getElementById("ai-compteur").value;const compteur=cv!==""?Number(cv):null;
+  const conforme=!items.some(x=>x.etat==="defaut");
+  const nom=(document.getElementById("ai-nom").value||"").trim()||"Anonyme";
+  const insp={id:uid("ins"),ressourceId:null,rapporteurNom:nom,equipementId:a.eqId,equipementNom:a.eqNom,date:new Date().toISOString(),items,compteur,note:(document.getElementById("ai-note").value||"").trim(),conforme};
+  const btn=document.getElementById("ai-go");btn.disabled=true;btn.textContent="Envoi…";
+  try{
+    const u=a.u||localStorage.getItem("sb_url"),k=a.k||localStorage.getItem("sb_key");
+    if(window.supabase){
+      if(!u||!k)throw new Error("Configuration manquante dans le QR");
+      const sbc=window.supabase.createClient(u,k);
+      let r=await sbc.from("inspections").upsert({id:insp.id,data:insp,updated_at:new Date().toISOString()});if(r.error)throw r.error;
+      if(!conforme){const defs=items.filter(x=>x.etat==="defaut").map(x=>x.label);const tk={id:uid("tk"),equipementId:a.eqId,equipementNom:a.eqNom,type:"inspection",description:"Défaut(s) à l\'inspection : "+defs.join(", "),inspectionId:insp.id,rapporteur:nom,photo:null,dateOuvert:new Date().toISOString(),statut:"ouvert",reparation:null,createdAt:new Date().toISOString()};const r2=await sbc.from("tickets").upsert({id:tk.id,data:tk,updated_at:new Date().toISOString()});if(r2.error)throw r2.error;}
+    }else{
+      await openDB();await idbPut("inspections",insp);
+      if(!conforme){const defs=items.filter(x=>x.etat==="defaut").map(x=>x.label);await idbPut("tickets",{id:uid("tk"),equipementId:a.eqId,equipementNom:a.eqNom,type:"inspection",description:"Défaut(s) à l\'inspection : "+defs.join(", "),inspectionId:insp.id,rapporteur:nom,photo:null,dateOuvert:new Date().toISOString(),statut:"ouvert",reparation:null,createdAt:new Date().toISOString()});}
+    }
+    document.getElementById("anon-insp").innerHTML='<div class="anon-ok">✓ Inspection envoyée!'+(conforme?'':'<br><span style="color:#b45309;font-weight:600">Défaut(s) signalé(s) à l\'atelier.</span>')+'<br><span style="font-size:13px;font-weight:400;color:#889">Merci.</span></div>';
+  }catch(e){btn.disabled=false;btn.textContent="Réessayer";document.getElementById("anon-insp").insertAdjacentHTML("afterbegin",`<div class="gate-err">Erreur : ${(e.message||e)}</div>`);}
 }
 
 /* ==================================================================
