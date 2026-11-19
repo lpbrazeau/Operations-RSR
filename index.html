@@ -1029,6 +1029,7 @@ const STATUTS={
   perdu:{lbl:"Non-obtenue",cls:"st-perdu",c:"var(--red)"}
 };
 const RES_STATUTS={disponible:"Disponible",affecte:"Affecté",entretien:"En entretien",vacances:"Vacances / Absent",inactif:"Inactif"};
+function resActif(r){return !!r&&r.actif!==false&&r.statut!=="inactif";};
 const DOSSIER_TYPES={
   entretien:{lbl:"Entretien",c:"var(--amber)"},
   reparation:{lbl:"Réparation",c:"var(--red)"},
@@ -2247,7 +2248,7 @@ function renderPlanification(){
   const weeks=weeksOfYear(year);
   const nowWeek=isoWeek(new Date());
   const curIdx=nowWeek.year===year?nowWeek.week-1:-1;
-  let ress=DATA.ressources.slice();
+  let ress=DATA.ressources.filter(resActif);
   if(f.type)ress=ress.filter(r=>r.type===f.type);
 
   const colW=64,resW=200;
@@ -2596,6 +2597,7 @@ function openRessource(id,defType){
           <option value="humaine" ${d.type==='humaine'?'selected':''}>👷 Humaine</option>
           <option value="mecanique" ${d.type==='mecanique'?'selected':''}>🚜 Mécanique</option></select></div>
         <div class="fld"><label>Catégorie</label>${d.type==='mecanique'?`<select id="r-cat" data-prev="${esc(d.categorie||'')}" onchange="catSelChange(this)">${[...new Set([...EQUIP_CATS,...distinctCats('mecanique'),d.categorie].filter(Boolean))].map(c=>`<option value="${esc(c)}" ${d.categorie===c?'selected':''}>${esc(c)}</option>`).join('')}<option value="__new__">➕ Autre (préciser)…</option></select>`:`<input id="r-cat" value="${esc(d.categorie||'')}" placeholder="Contremaître, Journalier…">`}</div>
+        <div class="fld"><label>Actif</label><label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-weight:400;font-size:13px"><input type="checkbox" id="r-actif" ${d.actif!==false?'checked':''}> Affiché dans la planif, le dispatch pis les impressions</label></div>
         <div class="fld"><label>Statut de base</label><select id="r-statut">${Object.keys(RES_STATUTS).map(s=>`<option value="${s}" ${d.statut===s?'selected':''}>${RES_STATUTS[s]}</option>`).join("")}</select></div>
         ${d.type==='humaine'?`<div class="fld"><label>Téléphone</label><input id="r-tel" value="${esc(d.tel||'')}" placeholder="418-…"></div>
         <div class="fld"><label>Matricule</label><input id="r-matricule" value="${esc(d.matricule||'')}"></div>`:''}
@@ -2707,7 +2709,7 @@ async function saveRessource(id,isNew){
   const existing=DATA.ressources.find(x=>x.id===id);
   const tauxV=$("#r-taux").value;const rtype=$("#r-type").value;
   const compV=$("#r-compteur")?$("#r-compteur").value:"";
-  const rec=Object.assign({},existing||{},{id,nom,type:rtype,categorie:$("#r-cat").value.trim(),statut:$("#r-statut").value,
+  const rec=Object.assign({},existing||{},{id,nom,type:rtype,categorie:$("#r-cat").value.trim(),statut:$("#r-statut").value,actif:$("#r-actif")?$("#r-actif").checked:true,
     tel:$("#r-tel")?($("#r-tel").value.trim()||null):((existing&&existing.tel)||null),matricule:$("#r-matricule")?$("#r-matricule").value.trim():((existing&&existing.matricule)||""),notes:$("#r-notes").value.trim(),
     tauxHoraire:tauxV===""?(rtype==="humaine"?TAUX_EMP_DEFAUT:0):Number(tauxV),
     preventifs:readPreventifs(),
@@ -3840,8 +3842,8 @@ function printDispatch(){
     return `<tr><td class="pd-proj"><b>${esc(rd.label)}</b><br><span>${esc(rd.sub)}</span></td>${cells}</tr>`;
   }).filter(Boolean).join("");
   const _rosterRow=(r)=>{const cells=days.map(d=>{const as=(DATA.affectations||[]).filter(a=>a.ressourceId===r.id&&coversDay(a,d));if(!as.length)return '<td class="pd-empty"></td>';const labels=[...new Set(as.map(a=>{const p=DATA.projets.find(x=>x.id===a.projetId);return p?p.numero:'?';}))];return `<td>${labels.map(esc).join('<br>')}</td>`;}).join("");const any=days.some(d=>(DATA.affectations||[]).some(a=>a.ressourceId===r.id&&coversDay(a,d)));return `<tr class="${any?'':'pd-unassigned'}"><td class="pd-proj">${r.type==='mecanique'?'🚜':'👷'} ${esc(resNom(r))}${any?'':' <span class="pd-flag">— non planifié</span>'}</td>${cells}</tr>`;};
-  const _hum=DATA.ressources.filter(r=>r.type==="humaine").sort((a,b)=>a.nom.localeCompare(b.nom));
-  const _meca=DATA.ressources.filter(r=>r.type==="mecanique").sort((a,b)=>equipNum(a)-equipNum(b)||a.nom.localeCompare(b.nom));
+  const _hum=DATA.ressources.filter(r=>r.type==="humaine"&&resActif(r)).sort((a,b)=>a.nom.localeCompare(b.nom));
+  const _meca=DATA.ressources.filter(r=>r.type==="mecanique"&&resActif(r)).sort((a,b)=>equipNum(a)-equipNum(b)||a.nom.localeCompare(b.nom));
   const rosterHtml=`<div class="pd-rostertitle">Vérification — présence par ressource <span style="font-weight:600;font-size:11px">(cases vides = disponible / non planifié)</span></div>
       <table class="pd-table pd-roster"><colgroup><col style="width:170px">${days.map(()=>'<col>').join("")}</colgroup><thead><tr><th class="pd-ph">Ressource</th>${dnames.map(n=>`<th>${esc(n)}</th>`).join("")}</tr></thead><tbody><tr class="pd-secrow"><td colspan="${days.length+1}">\uD83D\uDC77 Employés (${_hum.length})</td></tr>${_hum.map(_rosterRow).join("")}<tr class="pd-secrow"><td colspan="${days.length+1}">\uD83D\uDE9C Équipement (${_meca.length})</td></tr>${_meca.map(_rosterRow).join("")}</tbody></table>`;
   let st=document.getElementById("pd-ps");if(!st){st=document.createElement("style");st.id="pd-ps";document.head.appendChild(st);}st.textContent="@media print{@page{size:landscape;margin:6mm}} .pd-roster{margin-top:4px} .pd-roster .pd-secrow td{background:#1f2d3d;color:#fff;font-weight:800;font-size:10.5px;padding:3px 6px;text-align:left} .pd-roster td{font-size:10px;text-align:center} .pd-roster .pd-proj{text-align:left;font-weight:600} .pd-unassigned td{background:#fff2f2} .pd-flag{color:#c0392b;font-weight:800;font-size:9px} .pd-rostertitle{margin:16px 0 6px;font-weight:800;font-size:13px;color:#1f2d3d}";
@@ -4120,8 +4122,8 @@ function openDispatchAssign(projetId,date,affId,preCode){
   if(typeof adminOnly==="function"&&!adminOnly())return;
   DA_CTX={projetId,date};
   const ex=affId?(DATA.affectations||[]).find(a=>a.id===affId):null;const p=DATA.projets.find(x=>x.id===projetId);if(!p)return;
-  const humains=DATA.ressources.filter(r=>r.type==="humaine").sort((a,b)=>a.nom.localeCompare(b.nom));
-  const meca=DATA.ressources.filter(r=>r.type==="mecanique").sort((a,b)=>equipNum(a)-equipNum(b)||a.nom.localeCompare(b.nom));
+  const humains=DATA.ressources.filter(r=>r.type==="humaine"&&resActif(r)).sort((a,b)=>a.nom.localeCompare(b.nom));
+  const meca=DATA.ressources.filter(r=>r.type==="mecanique"&&resActif(r)).sort((a,b)=>equipNum(a)-equipNum(b)||a.nom.localeCompare(b.nom));
   const _catGroups=EQUIP_CATS.concat(["__autre"]).map(cat=>{const list=meca.filter(r=>cat==="__autre"?!EQUIP_CATS.includes(r.categorie||""):(r.categorie||"")===cat);if(!list.length)return "";return `<optgroup label="🚜 ${cat==="__autre"?"Autre / non catégorisé":cat}">${list.map(r=>`<option value="${r.id}" ${ex&&ex.ressourceId===r.id?"selected":""}>${esc(resNom(r))}</option>`).join("")}</optgroup>`;}).join("");
   const resOpts=`<optgroup label="👷 Employés">${humains.map(r=>{const vac=onVacation(r.id,date);return `<option value="${r.id}" ${ex&&ex.ressourceId===r.id?"selected":""} ${vac?"disabled":""}>${esc(resNom(r))}${vac?" · 🌴 en vacances":""}</option>`;}).join("")}</optgroup>${_catGroups}`;
   const opOpts=`<option value="">— aucun —</option>`+humains.map(r=>`<option value="${r.id}" ${ex&&ex.operateurId===r.id?"selected":""}>${esc(r.nom)}</option>`).join("");
