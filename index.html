@@ -2732,7 +2732,7 @@ async function deleteRessource(id){
 /* ---- Affectation modal ---- */
 var PLANIF_ACTIF="";
 function planifActifOptions(){
-  const opts=DATA.projets.filter(p=>["obtenu","en_cours","complete"].includes(p.statut))
+  const opts=DATA.projets.filter(p=>p.statut!=="perdu")
     .map(p=>`<option value="${p.id}" ${PLANIF_ACTIF===p.id?'selected':''}>${esc(p.numero)} · ${esc(p.nom)}</option>`).join("");
   return `<option value="">— projet actif : demander à chaque dépôt —</option>`+opts;
 }
@@ -2786,7 +2786,7 @@ function newAffectation(ressourceId,year,week,projetId){
   if(week){const w=weeksOfYear(year).find(x=>x.week===week);if(w){startDate=w.start.toISOString().slice(0,10);
     const end=new Date(w.start);end.setDate(end.getDate()+4);endDate=end.toISOString().slice(0,10);}}
   if(!startDate){const _cw=curWeekDates();startDate=_cw[0];endDate=_cw[1];}
-  const projOptions=DATA.projets.filter(p=>["obtenu","en_cours","complete"].includes(p.statut))
+  const projOptions=DATA.projets.filter(p=>p.statut!=="perdu")
     .map(p=>`<option value="${p.id}" ${projetId===p.id?'selected':''}>${esc(p.numero)} · ${esc(p.nom)}</option>`).join("");
   const teamOpts=(DATA.equipes||[]).length?`<optgroup label="Équipes complètes">${(DATA.equipes||[]).map(t=>{const ids=[...new Set([t.contremaitreId,...(t.membres||[])].filter(Boolean))];return `<option value="team:${t.id}">👥 ${esc(t.nom)} — toute l'équipe (${ids.length} ressource${ids.length>1?'s':''})</option>`;}).join("")}</optgroup>`:"";
   const resOptions=teamOpts+`<optgroup label="Ressources individuelles">`+DATA.ressources.map(r=>`<option value="${r.id}" ${ressourceId===r.id?'selected':''}>${r.type==='mecanique'?'🚜':'👷'} ${esc(resNom(r))}</option>`).join("")+`</optgroup>`;
@@ -2814,7 +2814,7 @@ function newAffectation(ressourceId,year,week,projetId){
 }
 function editAffectation(id){
   const a=DATA.affectations.find(x=>x.id===id);if(!a)return;
-  const projOptions=DATA.projets.filter(p=>["obtenu","en_cours","complete"].includes(p.statut))
+  const projOptions=DATA.projets.filter(p=>p.statut!=="perdu")
     .map(p=>`<option value="${p.id}" ${a.projetId===p.id?'selected':''}>${esc(p.numero)} · ${esc(p.nom)}</option>`).join("");
   const resOptions=DATA.ressources.map(r=>`<option value="${r.id}" ${a.ressourceId===r.id?'selected':''}>${r.type==='mecanique'?'🚜':'👷'} ${esc(resNom(r))}</option>`).join("");
   openModal(`
@@ -3006,7 +3006,7 @@ function editPointage(id){
   if(typeof adminOnly==="function"&&!adminOnly())return;
   const pt=(DATA.pointages||[]).find(x=>x.id===id);if(!pt)return;
   const emps=DATA.ressources.filter(r=>r.type==="humaine").sort((a,b)=>a.nom.localeCompare(b.nom));
-  const projs=DATA.projets.filter(p=>["obtenu","en_cours","complete"].includes(p.statut)).sort((a,b)=>a.numero<b.numero?1:-1);
+  const projs=DATA.projets.filter(p=>p.statut!=="perdu").sort((a,b)=>a.numero<b.numero?1:-1);
   const equips=DATA.ressources.filter(r=>r.type==="mecanique").sort((a,b)=>equipNum(a)-equipNum(b)||a.nom.localeCompare(b.nom));
   openModal(`
     <div class="modal-head"><div class="hx"><h2>Corriger le pointage</h2><div class="hs">Modifier l'employé, le projet, les heures, la pause…</div></div><button class="x" onclick="closeModal()">×</button></div>
@@ -3156,7 +3156,7 @@ function renderMateriaux(){
 function openBL(id){
   const bn=id?(DATA.bons||[]).find(x=>x.id===id):null;
   const d=bn||{id:uid("bl"),date:today(),numBL:"",fournisseur:"",po:"",projetId:filters.mat.projet||"",produit:"",quantite:"",prixUnit:"",montant:""};
-  const projs=DATA.projets.filter(p=>["obtenu","en_cours","complete"].includes(p.statut)).sort((a,b)=>a.numero<b.numero?1:-1);
+  const projs=DATA.projets.filter(p=>p.statut!=="perdu").sort((a,b)=>a.numero<b.numero?1:-1);
   const projOpts=`<option value="">— choisir —</option>`+projs.map(p=>`<option value="${p.id}" ${d.projetId===p.id?'selected':''}>${esc(p.numero)} · ${esc(p.nom)}</option>`).join("");
   const matOpts=`<option value="">— choisir —</option>`+(DATA.materiaux||[]).map(m=>`<option value="${esc(m.nom)}" ${d.produit===m.nom?'selected':''}>${esc(m.nom)}${m.prix!=null?' ('+fmtMoney(m.prix)+')':''}</option>`).join("");
   openModal(`
@@ -4323,7 +4323,7 @@ function generatePointageReport(){
   $("#route-preview").classList.add("open");closeModal();
 }
 function openProjetReportDialog(pid){
-  const projs=DATA.projets.filter(p=>["obtenu","en_cours","complete"].includes(p.statut)).sort((a,b)=>a.numero<b.numero?1:-1);
+  const projs=DATA.projets.filter(p=>p.statut!=="perdu").sort((a,b)=>a.numero<b.numero?1:-1);
   const opts=projs.map(p=>`<option value="${p.id}" ${pid===p.id?"selected":""}>${esc(p.numero)} · ${esc(p.nom)}</option>`).join("");
   openModal(`
     <div class="modal-head"><div class="hx"><h2>Rapport de projet</h2><div class="hs">Heures, équipement & matériaux → coûts, sur une période</div></div><button class="x" onclick="closeModal()">×</button></div>
