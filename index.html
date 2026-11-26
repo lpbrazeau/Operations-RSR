@@ -2779,11 +2779,13 @@ function wirePlanifDnD(){
     else if(data.indexOf("team:")===0)planifDropAssign("team",data.slice(5),wk);
   });
 }
+function curWeekDates(){const t=new Date();const dow=(t.getDay()+6)%7;const m=new Date(t);m.setDate(t.getDate()-dow);const f=new Date(m);f.setDate(m.getDate()+4);return [isoLocal(m),isoLocal(f)];}
 function newAffectation(ressourceId,year,week,projetId){
   if(!adminOnly())return;
   let startDate="",endDate="";
   if(week){const w=weeksOfYear(year).find(x=>x.week===week);if(w){startDate=w.start.toISOString().slice(0,10);
     const end=new Date(w.start);end.setDate(end.getDate()+4);endDate=end.toISOString().slice(0,10);}}
+  if(!startDate){const _cw=curWeekDates();startDate=_cw[0];endDate=_cw[1];}
   const projOptions=DATA.projets.filter(p=>["obtenu","en_cours","complete"].includes(p.statut))
     .map(p=>`<option value="${p.id}" ${projetId===p.id?'selected':''}>${esc(p.numero)} · ${esc(p.nom)}</option>`).join("");
   const teamOpts=(DATA.equipes||[]).length?`<optgroup label="Équipes complètes">${(DATA.equipes||[]).map(t=>{const ids=[...new Set([t.contremaitreId,...(t.membres||[])].filter(Boolean))];return `<option value="team:${t.id}">👥 ${esc(t.nom)} — toute l'équipe (${ids.length} ressource${ids.length>1?'s':''})</option>`;}).join("")}</optgroup>`:"";
@@ -2841,7 +2843,7 @@ async function saveAffectation(projetIdReturn){
     if(team){
       const ids=[...new Set([team.contremaitreId,...(team.membres||[])].filter(Boolean))];
       const cid=(projHasCodes(projetId)&&$("#a-code"))?($("#a-code").value||null):null;
-      const deb=$("#a-debut").value||null,fin=$("#a-fin").value||null,he=Number($("#a-heures").value)||DEFAULT_HEURES,role=$("#a-role").value.trim();
+      let deb=$("#a-debut").value||null,fin=$("#a-fin").value||null;if(!deb){const _cw=curWeekDates();deb=_cw[0];fin=fin||_cw[1];}const he=Number($("#a-heures").value)||DEFAULT_HEURES,role=$("#a-role").value.trim();
       let vskip=0;
       for(const rid of ids){if(!DATA.ressources.find(r=>r.id===rid))continue;if(vacOverlaps(rid,deb,fin)){vskip++;continue;}await idbPut("affectations",{id:uid("a"),projetId,ressourceId:rid,codeId:cid,dateDebut:deb,dateFin:fin,heures:he,role});}
       await loadAll();
@@ -2852,7 +2854,7 @@ async function saveAffectation(projetIdReturn){
     }
   }
   const codeId=(projHasCodes(projetId)&&$("#a-code"))?($("#a-code").value||null):null;
-  const rec={id:uid("a"),projetId,ressourceId,codeId,dateDebut:$("#a-debut").value||null,dateFin:$("#a-fin").value||null,heures:Number($("#a-heures").value)||DEFAULT_HEURES,role:$("#a-role").value.trim()};
+  let _sd=$("#a-debut").value||null,_sf=$("#a-fin").value||null;if(!_sd){const _cw=curWeekDates();_sd=_cw[0];_sf=_sf||_cw[1];}const rec={id:uid("a"),projetId,ressourceId,codeId,dateDebut:_sd,dateFin:_sf,heures:Number($("#a-heures").value)||DEFAULT_HEURES,role:$("#a-role").value.trim()};
   const vac=(DATA.vacances||[]).some(v=>v.ressourceId===ressourceId&&rec.dateDebut&&rec.dateFin&&!(v.dateFin<rec.dateDebut||v.dateDebut>rec.dateFin));
   await idbPut("affectations",rec);
   const _team=(DATA.equipes||[]).find(e=>e.contremaitreId===ressourceId);
