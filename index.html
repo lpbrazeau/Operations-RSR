@@ -2748,7 +2748,7 @@ async function planifDropAssign(kind,dragId,week){
   ids=ids.filter(id=>DATA.ressources.find(r=>r.id===id));
   if(!ids.length){toast("Ressource introuvable","err");return;}
   const projetId=PLANIF_ACTIF;
-  if(!projetId){ if(kind==="team"){newAffectation(ids[0],year,week);} else {newAffectation(dragId,year,week);} return; }
+  if(!projetId){ if(kind==="team"){newAffectation("team:"+dragId,year,week);} else {newAffectation(dragId,year,week);} return; }
   const proj=DATA.projets.find(p=>p.id===projetId); if(!proj){toast("Projet actif invalide","err");return;}
   let done=0,vskip=0;
   for(const rid of ids){
@@ -2788,7 +2788,7 @@ function newAffectation(ressourceId,year,week,projetId){
   if(!startDate){const _cw=curWeekDates();startDate=_cw[0];endDate=_cw[1];}
   const projOptions=DATA.projets.filter(p=>p.statut!=="perdu")
     .map(p=>`<option value="${p.id}" ${projetId===p.id?'selected':''}>${esc(p.numero)} · ${esc(p.nom)}</option>`).join("");
-  const teamOpts=(DATA.equipes||[]).length?`<optgroup label="Équipes complètes">${(DATA.equipes||[]).map(t=>{const ids=[...new Set([t.contremaitreId,...(t.membres||[])].filter(Boolean))];return `<option value="team:${t.id}">👥 ${esc(t.nom)} — toute l'équipe (${ids.length} ressource${ids.length>1?'s':''})</option>`;}).join("")}</optgroup>`:"";
+  const teamOpts=(DATA.equipes||[]).length?`<optgroup label="Équipes complètes">${(DATA.equipes||[]).map(t=>{const ids=[...new Set([t.contremaitreId,...(t.membres||[])].filter(Boolean))];return `<option value="team:${t.id}" ${ressourceId==="team:"+t.id?'selected':''}>👥 ${esc(t.nom)} — toute l'équipe (${ids.length} ressource${ids.length>1?'s':''})</option>`;}).join("")}</optgroup>`:"";
   const resOptions=teamOpts+`<optgroup label="Ressources individuelles">`+DATA.ressources.map(r=>`<option value="${r.id}" ${ressourceId===r.id?'selected':''}>${r.type==='mecanique'?'🚜':'👷'} ${esc(resNom(r))}</option>`).join("")+`</optgroup>`;
   openModal(`
     <div class="modal-head"><div class="hx"><h2>Affecter une ressource</h2><div class="hs">Assigner à un projet · ${DEFAULT_HEURES} h par défaut au taux de la ressource</div></div>
