@@ -2798,7 +2798,7 @@ function newAffectation(ressourceId,year,week,projetId){
         <div class="fld full"><label>Projet</label><select id="a-projet" onchange="affProjChange()">${projOptions||'<option value="">— aucun projet obtenu —</option>'}</select></div>
         <div class="fld full" id="a-code-wrap" style="display:${projHasCodes(projetId)?'':'none'}"><label>Code de coût</label><select id="a-code">${codeOptions(projetId,null)}</select></div>
         <div class="fld full"><label>Ressource</label><select id="a-res" onchange="updateAffCost();affTeamCheck()">${resOptions}</select></div>
-        <div class="fld full" id="a-team-wrap" style="display:none"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;background:var(--surface-2);padding:8px 10px;border-radius:8px"><input type="checkbox" id="a-team" checked> <span id="a-team-lbl"></span></label></div>
+        <div class="fld full" id="a-team-wrap" style="display:none"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;background:var(--surface-2);padding:8px 10px;border-radius:8px"><input type="checkbox" id="a-team"> <span id="a-team-lbl"></span></label></div>
         <div class="fld"><label>Début</label><input type="date" id="a-debut" value="${startDate}" onchange="updateAffCost()"></div>
         <div class="fld"><label>Fin</label><input type="date" id="a-fin" value="${endDate}" onchange="updateAffCost()"></div>
         <div class="fld"><label>Heures</label><input type="number" step="0.5" id="a-heures" value="${DEFAULT_HEURES}" oninput="updateAffCost()"></div>
