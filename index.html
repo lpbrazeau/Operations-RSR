@@ -2261,10 +2261,12 @@ function renderPlanification(){
     head+=`<div class="pg-week ${i===curIdx?'cur':''}">S-${String(w.week).padStart(2,"0")}<small>${dl}</small></div>`;});
   head+=`</div>`;
 
-  function rowFor(r){
+  var dispOnlyAssigned=true;
+function dispToggleEmpty(){dispOnlyAssigned=!dispOnlyAssigned;renderDispatch();}
+function rowFor(r,projId){
     const cells=[];for(let i=0;i<52;i++)cells.push([]);
     // affectations
-    DATA.affectations.filter(a=>a.ressourceId===r.id).forEach(a=>{
+    DATA.affectations.filter(a=>a.ressourceId===r.id&&(!projId||a.projetId===projId)).forEach(a=>{
       const s=dateToWeekIdx(a.dateDebut,year), e=dateToWeekIdx(a.dateFin||a.dateDebut,year);
       if(s==null)return;const proj=DATA.projets.find(p=>p.id===a.projetId);
       const from=Math.max(0,s),to=Math.min(51,e==null?s:e);
@@ -2272,13 +2274,13 @@ function renderPlanification(){
       for(let i=from;i<=to;i++)cells[i].push({label:proj?proj.numero:"?",code:_c?_c.code:"",title:(proj?proj.numero+" "+proj.nom:"")+(_c?" · code "+_c.code+(_c.nom?" "+_c.nom:""):""),cls:"affect",id:a.id,at:"aff"});
     });
     // vacances (bloque = indisponible)
-    (DATA.vacances||[]).filter(v=>v.ressourceId===r.id).forEach(v=>{
+    (projId?[]:(DATA.vacances||[])).filter(v=>v.ressourceId===r.id).forEach(v=>{
       const s=dateToWeekIdx(v.dateDebut,year),e=dateToWeekIdx(v.dateFin||v.dateDebut,year);
       if(s==null)return;const from=Math.max(0,s),to=Math.min(51,e==null?s:e);
       for(let i=from;i<=to;i++)cells[i].push({label:"Vacances",title:(r.nom+" · Vacances "+fmtDate(v.dateDebut)+" → "+fmtDate(v.dateFin)),cls:"vacances",id:v.id,at:"vac"});
     });
     // dossier blocks (entretien/formation/inspection…)
-    (r.dossier||[]).forEach(d=>{
+    (projId?[]:(r.dossier||[])).forEach(d=>{
       if(!["entretien","vacances","formation","inspection","reparation"].includes(d.type))return;
       const _bs=d.blocDebut||d.date;if(!_bs)return;const _be=d.blocFin||d.echeance||_bs;const s=dateToWeekIdx(_bs,year),e=dateToWeekIdx(_be,year);
       if(s==null)return;const from=Math.max(0,s),to=Math.min(51,e==null?s:e);
@@ -2318,6 +2320,16 @@ function renderPlanification(){
     const hors=ress.filter(r=>!assigned.has(r.id));
     if(hors.length){body+=`<div class="pg-sub">Hors équipe</div>`+hors.map(rowFor).join("");}
     if(!eqs.length)body=`<div class="empty" style="grid-column:1/-1">Aucune équipe. Clique « Gérer les équipes » pour en créer une.</div>`;
+  }else if(f.group==='projet'){
+    const idxp=[];
+    DATA.affectations.forEach(a=>{if(dateToWeekIdx(a.dateDebut,year)==null)return;if(!ress.find(r=>r.id===a.ressourceId))return;if(a.projetId&&!idxp.includes(a.projetId))idxp.push(a.projetId);});
+    const plist=idxp.map(id=>DATA.projets.find(p=>p.id===id)).filter(Boolean).sort((a,b)=>(a.numero||'').localeCompare(b.numero||''));
+    plist.forEach(pr=>{
+      const rows=ress.filter(r=>DATA.affectations.some(a=>a.projetId===pr.id&&a.ressourceId===r.id&&dateToWeekIdx(a.dateDebut,year)!=null));
+      body+=`<div class="pg-sub eq" style="border-left:4px solid var(--accent)"><b>${esc(pr.numero)}</b> ${esc(pr.nom)} <span style="opacity:.65;font-weight:400">· ${rows.length} ressource${rows.length>1?'s':''}</span></div>`;
+      body+=rows.map(r=>rowFor(r,pr.id)).join("");
+    });
+    if(!plist.length)body+=`<div class="pg-empty-eq">Aucun projet avec une ressource assignée</div>`;
   }else{
     const humaines=ress.filter(r=>r.type==="humaine");
     const mecaniques=ress.filter(r=>r.type==="mecanique");
@@ -2325,13 +2337,13 @@ function renderPlanification(){
     if(mecaniques.length){body+=`<div class="pg-sub">🚜 Ressources mécaniques</div>`+mecaniques.map(rowFor).join("");}
   }
 
-  const byEq=f.group==='equipe';
+  const byEq=f.group==='equipe';const byProj=f.group==='projet';
   const _scP=document.querySelector(".content"); const _stP=_scP?_scP.scrollTop:0;
   $("#view-planification").innerHTML=`
     ${planifAlertsBanner()}
     ${!isAdmin()?`<div class="ro-banner">👁️ Lecture seule — voici la planification. ${MY_RESSOURCE?"Cherche ton nom pour voir ton horaire.":""}</div>`:""}
     <div class="toolbar">
-      <div class="segbtn"><button class="chip ${!byEq?'on':''}" data-g="">Par ressource</button><button class="chip ${byEq?'on':''}" data-g="equipe">Par équipe</button></div>
+      <div class="segbtn"><button class="chip ${!f.group?'on':''}" data-g="">Par ressource</button><button class="chip ${f.group==='equipe'?'on':''}" data-g="equipe">Par équipe</button><button class="chip ${f.group==='projet'?'on':''}" data-g="projet">Par projet</button></div>
       ${(typeof isAdmin!=="function"||isAdmin())?`<label class="planif-actif-lbl" title="Choisis un projet, pis glisse une ressource ou une équipe sur une semaine pour l'affecter d'un coup">🎯 <select id="planif-actif" onchange="PLANIF_ACTIF=this.value">${planifActifOptions()}</select></label>`:''}
       ${byEq?'':`<span style="width:1px;height:20px;background:var(--line)"></span>
       <button class="chip ${!f.type?'on':''}" data-t="">Toutes</button>
@@ -3831,7 +3843,8 @@ function printDispatch(){
   const projs=DATA.projets.filter(p=>["obtenu","en_cours"].includes(p.statut)).sort((a,b)=>a.numero<b.numero?1:-1);
   const codeMatch=(a,rd)=>rd.codeId==null?true:(rd.codeId==="__none__"?!a.codeId:a.codeId===rd.codeId);
   const rowDefs=[];
-  projs.forEach(pr=>{const codes=projCodes(pr.id);if(codes.length){codes.forEach(c=>{const has=(DATA.affectations||[]).some(a=>a.projetId===pr.id&&a.codeId===c.id&&days.some(d=>coversDay(a,d)));if(has||DISP_SHOWN_CODES[pr.id+":"+c.id])rowDefs.push({pr,codeId:c.id,label:pr.numero,sub:(c.code+(c.nom?" · "+c.nom:"")),shown:!has});});rowDefs.push({pr,codeId:"__none__",label:pr.numero,sub:"➕ ajouter un code",picker:true});}else{rowDefs.push({pr,codeId:null,label:pr.numero,sub:pr.nom});}});
+  const projsShown=(typeof dispOnlyAssigned==="undefined"||dispOnlyAssigned)?projs.filter(pr=>(DATA.affectations||[]).some(a=>a.projetId===pr.id&&days.some(d=>coversDay(a,d)))):projs;
+  projsShown.forEach(pr=>{const codes=projCodes(pr.id);if(codes.length){codes.forEach(c=>{const has=(DATA.affectations||[]).some(a=>a.projetId===pr.id&&a.codeId===c.id&&days.some(d=>coversDay(a,d)));if(has||DISP_SHOWN_CODES[pr.id+":"+c.id])rowDefs.push({pr,codeId:c.id,label:pr.numero,sub:(c.code+(c.nom?" · "+c.nom:"")),shown:!has});});rowDefs.push({pr,codeId:"__none__",label:pr.numero,sub:"➕ ajouter un code",picker:true});}else{rowDefs.push({pr,codeId:null,label:pr.numero,sub:pr.nom});}});
   const rows=rowDefs.map(rd=>{
     const pr=rd.pr;
     const weekAffs=(DATA.affectations||[]).filter(a=>a.projetId===pr.id&&codeMatch(a,rd)&&days.some(d=>coversDay(a,d)));
@@ -4083,7 +4096,8 @@ function renderDispatch(){
   const dnames=days.map(d=>{const dt=new Date(d+"T00:00:00");return cap(dt.toLocaleDateString("fr-CA",{weekday:"short"}))+" "+dt.getDate();});
   const codeMatch=(a,rd)=>rd.codeId==null?true:(rd.codeId==="__none__"?!a.codeId:a.codeId===rd.codeId);
   const rowDefs=[];
-  projs.forEach(pr=>{const codes=projCodes(pr.id);if(codes.length){codes.forEach(c=>{const has=(DATA.affectations||[]).some(a=>a.projetId===pr.id&&a.codeId===c.id&&days.some(d=>coversDay(a,d)));if(has||DISP_SHOWN_CODES[pr.id+":"+c.id])rowDefs.push({pr,codeId:c.id,label:pr.numero,sub:(c.code+(c.nom?" · "+c.nom:"")),shown:!has});});rowDefs.push({pr,codeId:"__none__",label:pr.numero,sub:"➕ ajouter un code",picker:true});}else{rowDefs.push({pr,codeId:null,label:pr.numero,sub:pr.nom});}});
+  const projsShown=(typeof dispOnlyAssigned==="undefined"||dispOnlyAssigned)?projs.filter(pr=>(DATA.affectations||[]).some(a=>a.projetId===pr.id&&days.some(d=>coversDay(a,d)))):projs;
+  projsShown.forEach(pr=>{const codes=projCodes(pr.id);if(codes.length){codes.forEach(c=>{const has=(DATA.affectations||[]).some(a=>a.projetId===pr.id&&a.codeId===c.id&&days.some(d=>coversDay(a,d)));if(has||DISP_SHOWN_CODES[pr.id+":"+c.id])rowDefs.push({pr,codeId:c.id,label:pr.numero,sub:(c.code+(c.nom?" · "+c.nom:"")),shown:!has});});rowDefs.push({pr,codeId:"__none__",label:pr.numero,sub:"➕ ajouter un code",picker:true});}else{rowDefs.push({pr,codeId:null,label:pr.numero,sub:pr.nom});}});
   const rows=rowDefs.map(rd=>{
     const pr=rd.pr;
     const weekAffs=(DATA.affectations||[]).filter(a=>a.projetId===pr.id&&codeMatch(a,rd)&&days.some(d=>coversDay(a,d)));
@@ -4107,6 +4121,7 @@ function renderDispatch(){
       <div style="font-weight:700;min-width:220px;text-align:center">Semaine du ${fmtDate(monIso)} au ${fmtDate(sunIso)}</div>
       <button class="btn sm ghost" onclick="dispShift(1)">▶</button>
       <button class="btn sm ghost" onclick="dispWeek=null;renderDispatch()">Cette semaine</button>
+      <button class="btn sm ghost" onclick="dispToggleEmpty()" title="Afficher ou cacher les projets sans personne d'assigné cette semaine">${(typeof dispOnlyAssigned==="undefined"||dispOnlyAssigned)?"📋 Projets assignés":"📋 Tous les projets"}</button>
       <button class="btn sm ghost" onclick="openSmsDispatch()" title="Envoyer la planif par texto">📱 Textos</button>
       <button class="btn sm ghost" onclick="printDispatch()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg> Imprimer</button>${admin?`<button class="btn sm ghost" onclick="openEquipesManager()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="18" cy="9" r="2.2"/></svg> Équipes</button><button class="btn sm" onclick="newAffectation(null,new Date().getFullYear(),null,null)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Planifier (plusieurs jours)</button>`:''}
       <div style="flex:1"></div><div class="kpi-inline">${projs.length} projet(s) actif(s)</div>
