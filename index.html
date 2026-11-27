@@ -776,7 +776,7 @@ body.role-emp .pg-cell{cursor:default}
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <img id="brand-logo" class="brand-logo" alt="Excavations R.S.R.">
-      <div class="txt"><b>Gestion des opérations</b><span>Excavations R.S.R. inc.</span><span class="buildstamp" style="font-size:9.5px;opacity:.6;letter-spacing:.3px">v. 2026-11-26-J</span></div>
+      <div class="txt"><b>Gestion des opérations</b><span>Excavations R.S.R. inc.</span><span class="buildstamp" style="font-size:9.5px;opacity:.6;letter-spacing:.3px">v. 2026-11-26-K</span></div>
     </div>
     <nav class="nav" id="nav">
       <a href="#dashboard" data-v="dashboard" class="active">
@@ -4162,6 +4162,7 @@ function renderDispatch(){
       <button class="btn sm ghost" onclick="dispShift(1)">▶</button>
       <button class="btn sm ghost" onclick="dispWeek=null;renderDispatch()">Cette semaine</button>
       <button class="btn sm ghost" onclick="dispToggleEmpty()" title="Afficher ou cacher les projets sans personne d'assigné cette semaine">${(typeof dispOnlyAssigned==="undefined"||dispOnlyAssigned)?"📋 Projets assignés":"📋 Tous les projets"}</button>
+      ${(typeof isAdmin!=="function"||isAdmin())?`<button class="btn sm ghost" onclick="completeTeams()" title="Ajoute automatiquement les membres manquants des équipes dont le contremaître est déjà affecté (semaine courante et à venir)">\ud83d\udd27 Compléter les équipes</button>`:""}
       <button class="btn sm ghost" onclick="openSmsDispatch()" title="Envoyer la planif par texto">📱 Textos</button>
       <button class="btn sm ghost" onclick="printDispatch()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg> Imprimer</button>${admin?`<button class="btn sm ghost" onclick="openEquipesManager()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="18" cy="9" r="2.2"/></svg> Équipes</button><button class="btn sm" onclick="newAffectation(null,new Date().getFullYear(),null,null)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Planifier (plusieurs jours)</button>`:''}
       <div style="flex:1"></div><div class="kpi-inline">${projs.length} projet(s) actif(s)</div>
